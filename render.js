@@ -1,17 +1,12 @@
-/* =========================================================
-   TASK MANAGER V2
-   RENDER.JS
+// ========================================
+// RENDER.JS
+// Task Manager V2
+// Week 2 + Week 3 + Admin
+// ========================================
 
-   Handles all UI rendering.
-========================================================= */
-
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function escapeHTML(value) {
-    return String(value ?? "")
+// ---------- SECURITY ----------
+export function escapeHTML(value = "") {
+    return String(value)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -20,807 +15,920 @@ function escapeHTML(value) {
 }
 
 
-function getStatusClass(status) {
-    return String(status || "To Do")
+// ---------- HELPERS ----------
+export function getStatusClass(status = "To Do") {
+    return status
         .toLowerCase()
         .replace(/\s+/g, "-");
 }
 
+export function formatDate(date) {
+    if (!date) return "No due date";
 
-function formatDate(date) {
+    const d = new Date(date);
 
-    if (!date) {
-        return "No due date";
-    }
-
-    const parsed = new Date(date);
-
-    if (Number.isNaN(parsed.getTime())) {
+    if (Number.isNaN(d.getTime())) {
         return date;
     }
 
-    return parsed.toLocaleDateString("en-IN", {
+    return d.toLocaleDateString("en-IN", {
         day: "2-digit",
         month: "short",
         year: "numeric"
     });
 }
 
+export function getProgress(tasks = []) {
+    if (!tasks.length) return 0;
 
-/* =========================================================
-   TASK CARD
-========================================================= */
+    const completed = tasks.filter(task =>
+        task.status === "Done" || task.completed === true
+    ).length;
 
-function createTaskCard(task) {
-
-    const completedSubtasks = Array.isArray(task.subtasks)
-        ? task.subtasks.filter(item => item.done).length
-        : 0;
-
-    const totalSubtasks = Array.isArray(task.subtasks)
-        ? task.subtasks.length
-        : 0;
-
-    const subtaskText =
-        totalSubtasks > 0
-            ? `${completedSubtasks}/${totalSubtasks} subtasks`
-            : "";
-
-    return `
-        <article
-            class="task-card"
-            data-task-id="${escapeHTML(task.id)}"
-            draggable="true"
-        >
-
-            <div class="task-main">
-
-                <div class="task-title-row">
-
-                    <h3 class="task-title">
-                        ${escapeHTML(task.text)}
-                    </h3>
-
-                    <span class="task-badge ${getStatusClass(task.status)}">
-                        ${escapeHTML(task.status)}
-                    </span>
-
-                </div>
-
-
-                ${
-                    task.description
-                        ? `
-                            <p class="task-description">
-                                ${escapeHTML(task.description)}
-                            </p>
-                        `
-                        : ""
-                }
-
-
-                <div class="task-meta">
-
-                    <span class="task-badge">
-                        ${escapeHTML(task.category)}
-                    </span>
-
-                    <span class="task-badge">
-                        ${escapeHTML(task.priority || "Normal")}
-                    </span>
-
-                    ${
-                        task.dueDate
-                            ? `
-                                <span class="task-badge">
-                                    Due: ${escapeHTML(formatDate(task.dueDate))}
-                                </span>
-                            `
-                            : ""
-                    }
-
-                    ${
-                        subtaskText
-                            ? `
-                                <span class="task-badge">
-                                    ${subtaskText}
-                                </span>
-                            `
-                            : ""
-                    }
-
-                </div>
-
-            </div>
-
-
-            <div class="task-actions">
-
-                <button
-                    type="button"
-                    class="task-action-btn view-task-btn"
-                    data-task-id="${escapeHTML(task.id)}"
-                    title="Open task"
-                >
-                    Open
-                </button>
-
-
-                <button
-                    type="button"
-                    class="task-action-btn delete-task-btn"
-                    data-delete-task="${escapeHTML(task.id)}"
-                    title="Delete task"
-                >
-                    Delete
-                </button>
-
-            </div>
-
-        </article>
-    `;
+    return Math.round((completed / tasks.length) * 100);
 }
 
 
-/* =========================================================
-   RENDER TASK LIST
-========================================================= */
-
-export function renderTasks(
-    container,
-    tasks,
-    emptyState
-) {
-
-    if (!container) {
-        return;
-    }
-
-    if (!Array.isArray(tasks) || tasks.length === 0) {
-
-        container.innerHTML = "";
-
-        if (emptyState) {
-            emptyState.hidden = false;
-        }
-
-        return;
-    }
-
-    if (emptyState) {
-        emptyState.hidden = true;
-    }
-
-    container.innerHTML = tasks
-        .map(task => createTaskCard(task))
-        .join("");
-}
-
-
-/* =========================================================
-   RENDER PROJECTS
-========================================================= */
+// ========================================
+// PROJECTS
+// ========================================
 
 export function renderProjects(
     container,
-    projects,
-    activeProjectId
+    projects = [],
+    activeProjectId = ""
 ) {
+    if (!container) return;
 
-    if (!container) {
+    container.innerHTML = "";
+
+    if (!projects.length) {
+        container.innerHTML = `
+            <div class="project-empty">
+                No projects yet.
+            </div>
+        `;
         return;
     }
 
-    const safeProjects = Array.isArray(projects)
-        ? projects
-        : [];
+    projects.forEach(project => {
+        const button = document.createElement("button");
 
-    container.innerHTML = safeProjects
-        .map(project => {
+        button.className =
+            `project-item ${
+                project.id === activeProjectId ? "active" : ""
+            }`;
 
-            const active =
-                project.id === activeProjectId
-                    ? "active"
-                    : "";
+        button.dataset.projectId = project.id;
 
-            return `
-                <button
-                    type="button"
-                    class="project-item ${active}"
-                    data-project-id="${escapeHTML(project.id)}"
-                >
-                    <span class="project-name">
-                        ${escapeHTML(project.name)}
-                    </span>
-                </button>
-            `;
-        })
-        .join("");
+        button.innerHTML = `
+            <span class="project-icon">📁</span>
+            <span class="project-name">
+                ${escapeHTML(project.name)}
+            </span>
+        `;
 
-
-    const newProjectButton = document.createElement("button");
-
-    newProjectButton.type = "button";
-    newProjectButton.className = "new-project-btn";
-    newProjectButton.id = "newProjectBtn";
-    newProjectButton.textContent = "+ New Project";
-
-    container.appendChild(newProjectButton);
+        container.appendChild(button);
+    });
 }
 
 
-/* =========================================================
-   RENDER PROJECT PROGRESS
-========================================================= */
+// ========================================
+// PROJECT PROGRESS
+// ========================================
 
 export function renderProgress(
     progressText,
     progressFill,
-    tasks
+    progressPercentage,
+    tasks = []
 ) {
-
-    if (!Array.isArray(tasks)) {
-        tasks = [];
-    }
-
-    const total = tasks.length;
-
-    const completed = tasks.filter(
-        task => task.status === "Done"
-    ).length;
-
-    const percentage =
-        total > 0
-            ? Math.round((completed / total) * 100)
-            : 0;
-
+    const percentage = getProgress(tasks);
 
     if (progressText) {
-
         progressText.textContent =
-            `${completed} of ${total} tasks done`;
+            `${tasks.filter(task =>
+                task.status === "Done" ||
+                task.completed === true
+            ).length} of ${tasks.length} tasks done`;
     }
 
-
     if (progressFill) {
+        progressFill.style.width = `${percentage}%`;
+    }
 
-        progressFill.style.width =
-            `${percentage}%`;
+    if (progressPercentage) {
+        progressPercentage.textContent = `${percentage}%`;
     }
 }
 
 
-/* =========================================================
-   KANBAN BOARD
-========================================================= */
+// ========================================
+// TASK CARD
+// ========================================
 
-export function renderBoard(
-    boardElements,
-    tasks
+function createTaskCard(task) {
+    const card = document.createElement("article");
+
+    card.className = "task-card";
+    card.draggable = true;
+
+    card.dataset.taskId = task.id;
+
+    const status = task.status || "To Do";
+    const category = task.category || "Personal";
+    const priority = task.priority || "Medium";
+
+    card.innerHTML = `
+        <div class="task-card-top">
+
+            <div class="task-title-wrap">
+                <h3 class="task-title">
+                    ${escapeHTML(task.title || "Untitled Task")}
+                </h3>
+            </div>
+
+            <button
+                class="task-delete-btn"
+                type="button"
+                data-delete-task="${escapeHTML(task.id)}"
+                title="Delete task"
+            >
+                ×
+            </button>
+
+        </div>
+
+        ${
+            task.description
+                ? `
+                    <p class="task-description">
+                        ${escapeHTML(task.description)}
+                    </p>
+                `
+                : ""
+        }
+
+        <div class="task-meta">
+
+            <span class="task-category category-${getStatusClass(category)}">
+                ${escapeHTML(category)}
+            </span>
+
+            <span class="task-priority priority-${getStatusClass(priority)}">
+                ${escapeHTML(priority)}
+            </span>
+
+            <span class="task-status status-${getStatusClass(status)}">
+                ${escapeHTML(status)}
+            </span>
+
+        </div>
+
+        <div class="task-card-bottom">
+
+            <span class="task-due-date">
+                📅 ${escapeHTML(formatDate(task.dueDate))}
+            </span>
+
+            <button
+                class="task-open-btn"
+                type="button"
+                data-open-task="${escapeHTML(task.id)}"
+            >
+                View
+            </button>
+
+        </div>
+    `;
+
+    return card;
+}
+
+
+// ========================================
+// TASK LIST
+// ========================================
+
+export function renderTasks(
+    container,
+    tasks = []
 ) {
+    if (!container) return;
 
-    if (!boardElements) {
+    container.innerHTML = "";
+
+    if (!tasks.length) {
         return;
     }
 
-    const safeTasks = Array.isArray(tasks)
-        ? tasks
-        : [];
+    tasks.forEach(task => {
+        container.appendChild(
+            createTaskCard(task)
+        );
+    });
+}
 
 
-    const columns = {
-        "To Do": boardElements.todoColumn,
-        "In Progress": boardElements.inProgressColumn,
-        "In Review": boardElements.inReviewColumn,
-        "Done": boardElements.doneColumn
-    };
+// ========================================
+// EMPTY STATE
+// ========================================
+
+export function renderEmptyState(
+    emptyState,
+    hasTasks
+) {
+    if (!emptyState) return;
+
+    emptyState.hidden = hasTasks;
+}
 
 
-    const counts = {
-        "To Do": boardElements.todoCount,
-        "In Progress": boardElements.inProgressCount,
-        "In Review": boardElements.inReviewCount,
-        "Done": boardElements.doneCount
-    };
+// ========================================
+// KANBAN BOARD
+// ========================================
 
+export function renderBoard(
+    tasks = [],
+    columns = {}
+) {
+    const todoColumn = columns.todo;
+    const inProgressColumn = columns.inProgress;
+    const inReviewColumn = columns.inReview;
+    const doneColumn = columns.done;
 
-    Object.values(columns).forEach(column => {
+    const todoCount = columns.todoCount;
+    const inProgressCount = columns.inProgressCount;
+    const inReviewCount = columns.inReviewCount;
+    const doneCount = columns.doneCount;
 
+    const allColumns = [
+        todoColumn,
+        inProgressColumn,
+        inReviewColumn,
+        doneColumn
+    ];
+
+    allColumns.forEach(column => {
         if (column) {
             column.innerHTML = "";
         }
     });
 
+    const grouped = {
+        "To Do": [],
+        "In Progress": [],
+        "In Review": [],
+        "Done": []
+    };
 
-    Object.values(counts).forEach(count => {
+    tasks.forEach(task => {
+        const status = task.status || "To Do";
 
-        if (count) {
-            count.textContent = "0";
+        if (!grouped[status]) {
+            grouped["To Do"].push(task);
+        } else {
+            grouped[status].push(task);
         }
     });
 
-
-    safeTasks.forEach(task => {
-
-        const column = columns[task.status];
-
-        if (!column) {
-            return;
-        }
-
-
-        const boardCard =
-            document.createElement("div");
-
-        boardCard.className = "board-task";
-
-        boardCard.draggable = true;
-
-        boardCard.dataset.taskId = task.id;
-
-
-        boardCard.innerHTML = `
-
-            <div class="board-task-title">
-                ${escapeHTML(task.text)}
-            </div>
-
-            <div class="board-task-meta">
-
-                <span>
-                    ${escapeHTML(task.category)}
-                </span>
-
-                <span>
-                    ${escapeHTML(task.priority || "Normal")}
-                </span>
-
-            </div>
-
-        `;
-
-
-        column.appendChild(boardCard);
-
-
-        if (counts[task.status]) {
-
-            const current =
-                Number(counts[task.status].textContent) || 0;
-
-            counts[task.status].textContent =
-                String(current + 1);
+    grouped["To Do"].forEach(task => {
+        if (todoColumn) {
+            todoColumn.appendChild(
+                createTaskCard(task)
+            );
         }
     });
+
+    grouped["In Progress"].forEach(task => {
+        if (inProgressColumn) {
+            inProgressColumn.appendChild(
+                createTaskCard(task)
+            );
+        }
+    });
+
+    grouped["In Review"].forEach(task => {
+        if (inReviewColumn) {
+            inReviewColumn.appendChild(
+                createTaskCard(task)
+            );
+        }
+    });
+
+    grouped["Done"].forEach(task => {
+        if (doneColumn) {
+            doneColumn.appendChild(
+                createTaskCard(task)
+            );
+        }
+    });
+
+    if (todoCount) {
+        todoCount.textContent =
+            grouped["To Do"].length;
+    }
+
+    if (inProgressCount) {
+        inProgressCount.textContent =
+            grouped["In Progress"].length;
+    }
+
+    if (inReviewCount) {
+        inReviewCount.textContent =
+            grouped["In Review"].length;
+    }
+
+    if (doneCount) {
+        doneCount.textContent =
+            grouped["Done"].length;
+    }
 }
 
 
-/* =========================================================
-   TASK DETAIL
-========================================================= */
+// ========================================
+// TASK DETAIL
+// ========================================
 
 export function renderTaskDetail(
     task,
-    elements
+    elements = {}
 ) {
+    if (!task) return;
 
-    if (!task || !elements) {
-        return;
+    const {
+        title,
+        description,
+        status,
+        priority,
+        dueDate,
+        category,
+        notes
+    } = elements;
+
+    if (title) {
+        title.value = task.title || "";
     }
 
-
-    if (elements.title) {
-
-        elements.title.value =
-            task.text || "";
-    }
-
-
-    if (elements.description) {
-
-        elements.description.value =
+    if (description) {
+        description.value =
             task.description || "";
     }
 
-
-    if (elements.status) {
-
-        elements.status.textContent =
+    if (status) {
+        status.textContent =
             task.status || "To Do";
     }
 
-
-    if (elements.priority) {
-
-        elements.priority.textContent =
-            task.priority || "Normal";
+    if (priority) {
+        priority.textContent =
+            task.priority || "Medium";
     }
 
-
-    if (elements.dueDate) {
-
-        elements.dueDate.textContent =
-            task.dueDate
-                ? formatDate(task.dueDate)
-                : "No due date";
+    if (dueDate) {
+        dueDate.textContent =
+            formatDate(task.dueDate);
     }
 
-
-    if (elements.category) {
-
-        elements.category.textContent =
-            task.category || "Work";
+    if (category) {
+        category.textContent =
+            task.category || "Personal";
     }
 
-
-    if (elements.notes) {
-
-        elements.notes.value =
+    if (notes) {
+        notes.value =
             task.notes || "";
     }
 }
 
 
-/* =========================================================
-   SUBTASKS
-========================================================= */
+// ========================================
+// SUBTASKS
+// ========================================
 
 export function renderSubtasks(
     container,
-    subtasks
+    subtasks = []
 ) {
+    if (!container) return;
 
-    if (!container) {
-        return;
-    }
+    container.innerHTML = "";
 
-    const safeSubtasks =
-        Array.isArray(subtasks)
-            ? subtasks
-            : [];
-
-
-    if (safeSubtasks.length === 0) {
-
+    if (!subtasks.length) {
         container.innerHTML = `
-            <p class="empty-subtasks">
+            <div class="subtask-empty">
                 No subtasks yet.
-            </p>
+            </div>
         `;
 
         return;
     }
 
+    subtasks.forEach(subtask => {
+        const item = document.createElement("div");
 
-    container.innerHTML =
-        safeSubtasks
-            .map(subtask => {
+        item.className = "subtask-item";
 
-                const checked =
-                    subtask.done
-                        ? "checked"
-                        : "";
+        const completed =
+            subtask.completed === true ||
+            subtask.done === true;
 
-                return `
-                    <div
-                        class="subtask-item"
-                        data-subtask-id="${escapeHTML(subtask.id)}"
-                    >
+        item.innerHTML = `
+            <label class="subtask-label">
 
-                        <label>
+                <input
+                    type="checkbox"
+                    data-subtask-id="${escapeHTML(subtask.id)}"
+                    ${completed ? "checked" : ""}
+                >
 
-                            <input
-                                type="checkbox"
-                                class="subtask-checkbox"
-                                data-subtask-id="${escapeHTML(subtask.id)}"
-                                ${checked}
-                            >
+                <span class="${
+                    completed
+                        ? "subtask-completed"
+                        : ""
+                }">
+                    ${escapeHTML(
+                        subtask.title ||
+                        subtask.text ||
+                        ""
+                    )}
+                </span>
 
-                            <span class="${
-                                subtask.done
-                                    ? "completed"
-                                    : ""
-                            }">
-                                ${escapeHTML(subtask.text)}
-                            </span>
+            </label>
 
-                        </label>
-
-
-                        <button
-                            type="button"
-                            class="delete-subtask-btn"
-                            data-subtask-id="${escapeHTML(subtask.id)}"
-                        >
-                            Delete
-                        </button>
-
-                    </div>
-                `;
-            })
-            .join("");
-}
-
-
-/* =========================================================
-   ADMIN USERS
-========================================================= */
-
-export function renderAdminUsers(
-    container,
-    users,
-    taskStats = {}
-) {
-
-    if (!container) {
-        return;
-    }
-
-
-    const safeUsers =
-        Array.isArray(users)
-            ? users
-            : [];
-
-
-    if (safeUsers.length === 0) {
-
-        container.innerHTML = `
-            <p class="empty-state-text">
-                No users registered yet.
-            </p>
+            <button
+                type="button"
+                class="subtask-delete-btn"
+                data-delete-subtask="${escapeHTML(subtask.id)}"
+            >
+                ×
+            </button>
         `;
 
-        return;
-    }
-
-
-    container.innerHTML =
-        safeUsers
-            .map(user => {
-
-                const stats =
-                    taskStats[user.id] || {};
-
-                const total =
-                    Number(stats.total) || 0;
-
-                const completed =
-                    Number(stats.completed) || 0;
-
-                const progress =
-                    total > 0
-                        ? Math.round(
-                            (completed / total) * 100
-                        )
-                        : 0;
-
-
-                return `
-                    <div
-                        class="admin-user-card"
-                        data-user-id="${escapeHTML(user.id)}"
-                    >
-
-                        <div>
-
-                            <h3>
-                                ${escapeHTML(user.name)}
-                            </h3>
-
-                            <p>
-                                ${escapeHTML(user.email)}
-                            </p>
-
-                        </div>
-
-
-                        <div class="admin-user-stats">
-
-                            <span>
-                                ${total} Tasks
-                            </span>
-
-                            <span>
-                                ${completed} Done
-                            </span>
-
-                            <span>
-                                ${progress}%
-                            </span>
-
-                        </div>
-
-                    </div>
-                `;
-            })
-            .join("");
+        container.appendChild(item);
+    });
 }
 
 
-/* =========================================================
-   ADMIN REPORTS
-========================================================= */
-
-export function renderAdminReports(
-    container,
-    userStats
-) {
-
-    if (!container) {
-        return;
-    }
-
-
-    const safeStats =
-        Array.isArray(userStats)
-            ? userStats
-            : [];
-
-
-    if (safeStats.length === 0) {
-
-        container.innerHTML = `
-            <p class="empty-state-text">
-                No report data available.
-            </p>
-        `;
-
-        return;
-    }
-
-
-    container.innerHTML =
-        safeStats
-            .map(item => {
-
-                const user = item.user || {};
-
-                const total =
-                    Number(item.total) || 0;
-
-                const completed =
-                    Number(item.completed) || 0;
-
-                const pending =
-                    Number(item.pending) || 0;
-
-                const progress =
-                    total > 0
-                        ? Math.round(
-                            (completed / total) * 100
-                        )
-                        : 0;
-
-
-                return `
-                    <div class="report-card">
-
-                        <div class="report-header">
-
-                            <div>
-
-                                <h3>
-                                    ${escapeHTML(
-                                        user.name ||
-                                        "Unknown User"
-                                    )}
-                                </h3>
-
-                                <p>
-                                    ${escapeHTML(
-                                        user.email || ""
-                                    )}
-                                </p>
-
-                            </div>
-
-                            <strong>
-                                ${progress}%
-                            </strong>
-
-                        </div>
-
-
-                        <div class="report-progress">
-
-                            <div
-                                class="report-progress-fill"
-                                style="width:${progress}%"
-                            ></div>
-
-                        </div>
-
-
-                        <div class="report-stats">
-
-                            <span>
-                                Total: ${total}
-                            </span>
-
-                            <span>
-                                Completed: ${completed}
-                            </span>
-
-                            <span>
-                                Pending: ${pending}
-                            </span>
-
-                        </div>
-
-                    </div>
-                `;
-            })
-            .join("");
-}
-
-
-/* =========================================================
-   ADMIN SUMMARY
-========================================================= */
+// ========================================
+// ADMIN SUMMARY
+// ========================================
 
 export function renderAdminSummary(
     elements,
-    summary
+    users = [],
+    tasks = []
 ) {
+    const totalUsers = users.length;
+    const totalTasks = tasks.length;
 
-    if (!elements || !summary) {
+    const completedTasks = tasks.filter(task =>
+        task.status === "Done" ||
+        task.completed === true
+    ).length;
+
+    const pendingTasks =
+        totalTasks - completedTasks;
+
+    if (elements.totalUsers) {
+        elements.totalUsers.textContent =
+            totalUsers;
+    }
+
+    if (elements.totalTasks) {
+        elements.totalTasks.textContent =
+            totalTasks;
+    }
+
+    if (elements.pendingTasks) {
+        elements.pendingTasks.textContent =
+            pendingTasks;
+    }
+
+    if (elements.completedTasks) {
+        elements.completedTasks.textContent =
+            completedTasks;
+    }
+}
+
+
+// ========================================
+// ADMIN USER LIST
+// ========================================
+
+export function renderAdminUsers(
+    container,
+    userStats = []
+) {
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (!userStats.length) {
+        container.innerHTML = `
+            <div class="admin-empty">
+                No registered users yet.
+            </div>
+        `;
+
         return;
     }
 
+    userStats.forEach(stat => {
+        const card = document.createElement("div");
 
-    if (elements.totalUsers) {
+        card.className = "admin-user-card";
 
-        elements.totalUsers.textContent =
-            String(summary.totalUsers || 0);
+        const progress =
+            Number(stat.progress || 0);
+
+        card.innerHTML = `
+            <div class="admin-user-header">
+
+                <div>
+                    <h3>
+                        ${escapeHTML(
+                            stat.user?.name ||
+                            stat.name ||
+                            "Unknown User"
+                        )}
+                    </h3>
+
+                    <p>
+                        ${escapeHTML(
+                            stat.user?.email ||
+                            stat.email ||
+                            ""
+                        )}
+                    </p>
+                </div>
+
+                <span class="admin-progress-badge">
+                    ${progress}%
+                </span>
+
+            </div>
+
+            <div class="admin-user-stats">
+
+                <div>
+                    <strong>
+                        ${stat.total || 0}
+                    </strong>
+                    <span>Total</span>
+                </div>
+
+                <div>
+                    <strong>
+                        ${stat.completed || 0}
+                    </strong>
+                    <span>Done</span>
+                </div>
+
+                <div>
+                    <strong>
+                        ${stat.pending || 0}
+                    </strong>
+                    <span>Pending</span>
+                </div>
+
+            </div>
+
+            <div class="admin-progress-bar">
+                <div
+                    class="admin-progress-fill"
+                    style="width:${progress}%"
+                ></div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+
+// ========================================
+// ADMIN REPORTS
+// ========================================
+
+export function renderAdminReports(
+    container,
+    userStats = []
+) {
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (!userStats.length) {
+        container.innerHTML = `
+            <div class="admin-empty">
+                No report data available.
+            </div>
+        `;
+
+        return;
     }
 
+    const table = document.createElement("div");
 
-    if (elements.totalTasks) {
+    table.className = "reports-table";
 
-        elements.totalTasks.textContent =
-            String(summary.totalTasks || 0);
+    table.innerHTML = `
+        <div class="reports-row reports-header">
+
+            <div>User</div>
+            <div>Total</div>
+            <div>Completed</div>
+            <div>Pending</div>
+            <div>Progress</div>
+
+        </div>
+    `;
+
+    userStats.forEach(stat => {
+        const row = document.createElement("div");
+
+        row.className = "reports-row";
+
+        const progress =
+            Number(stat.progress || 0);
+
+        row.innerHTML = `
+            <div>
+                <strong>
+                    ${escapeHTML(
+                        stat.user?.name ||
+                        stat.name ||
+                        "Unknown"
+                    )}
+                </strong>
+
+                <small>
+                    ${escapeHTML(
+                        stat.user?.email ||
+                        stat.email ||
+                        ""
+                    )}
+                </small>
+            </div>
+
+            <div>
+                ${stat.total || 0}
+            </div>
+
+            <div>
+                ${stat.completed || 0}
+            </div>
+
+            <div>
+                ${stat.pending || 0}
+            </div>
+
+            <div>
+                <strong>
+                    ${progress}%
+                </strong>
+            </div>
+        `;
+
+        table.appendChild(row);
+    });
+
+    container.appendChild(table);
+}
+
+
+// ========================================
+// ADMIN TASK CARD
+// ========================================
+
+export function createAdminTaskCard(
+    task,
+    user = null
+) {
+    const card = document.createElement("article");
+
+    card.className = "task-card admin-task-card";
+
+    card.draggable = true;
+
+    card.dataset.taskId = task.id;
+
+    if (user?.id) {
+        card.dataset.userId = user.id;
     }
 
+    const status = task.status || "To Do";
+    const category = task.category || "Personal";
+    const priority = task.priority || "Medium";
 
-    if (elements.pendingTasks) {
+    card.innerHTML = `
+        <div class="task-card-top">
 
-        elements.pendingTasks.textContent =
-            String(summary.pendingTasks || 0);
+            <div>
+                <h3 class="task-title">
+                    ${escapeHTML(
+                        task.title ||
+                        "Untitled Task"
+                    )}
+                </h3>
+            </div>
+
+        </div>
+
+        ${
+            task.description
+                ? `
+                    <p class="task-description">
+                        ${escapeHTML(
+                            task.description
+                        )}
+                    </p>
+                `
+                : ""
+        }
+
+        <div class="admin-assigned-user">
+
+            👤
+            ${escapeHTML(
+                user?.name ||
+                task.assignedToName ||
+                "Unknown User"
+            )}
+
+        </div>
+
+        <div class="task-meta">
+
+            <span class="task-category">
+                ${escapeHTML(category)}
+            </span>
+
+            <span class="task-priority">
+                ${escapeHTML(priority)}
+            </span>
+
+            <span class="task-status status-${getStatusClass(status)}">
+                ${escapeHTML(status)}
+            </span>
+
+        </div>
+
+        <div class="task-card-bottom">
+
+            <span>
+                📅 ${escapeHTML(
+                    formatDate(task.dueDate)
+                )}
+            </span>
+
+        </div>
+    `;
+
+    return card;
+}
+
+
+// ========================================
+// ADMIN BOARD
+// ========================================
+
+export function renderAdminBoard(
+    tasks = [],
+    users = [],
+    columns = {}
+) {
+    const todoColumn = columns.todo;
+    const inProgressColumn = columns.inProgress;
+    const inReviewColumn = columns.inReview;
+    const doneColumn = columns.done;
+
+    const todoCount = columns.todoCount;
+    const inProgressCount = columns.inProgressCount;
+    const inReviewCount = columns.inReviewCount;
+    const doneCount = columns.doneCount;
+
+    [
+        todoColumn,
+        inProgressColumn,
+        inReviewColumn,
+        doneColumn
+    ].forEach(column => {
+        if (column) {
+            column.innerHTML = "";
+        }
+    });
+
+    const userMap = new Map();
+
+    users.forEach(user => {
+        userMap.set(user.id, user);
+    });
+
+    const grouped = {
+        "To Do": [],
+        "In Progress": [],
+        "In Review": [],
+        "Done": []
+    };
+
+    tasks.forEach(task => {
+        const status = task.status || "To Do";
+
+        if (grouped[status]) {
+            grouped[status].push(task);
+        } else {
+            grouped["To Do"].push(task);
+        }
+    });
+
+    function addTasks(
+        taskList,
+        column
+    ) {
+        if (!column) return;
+
+        taskList.forEach(task => {
+            const user =
+                userMap.get(task.assignedTo);
+
+            column.appendChild(
+                createAdminTaskCard(
+                    task,
+                    user
+                )
+            );
+        });
     }
 
+    addTasks(
+        grouped["To Do"],
+        todoColumn
+    );
 
-    if (elements.completedTasks) {
+    addTasks(
+        grouped["In Progress"],
+        inProgressColumn
+    );
 
-        elements.completedTasks.textContent =
-            String(summary.completedTasks || 0);
+    addTasks(
+        grouped["In Review"],
+        inReviewColumn
+    );
+
+    addTasks(
+        grouped["Done"],
+        doneColumn
+    );
+
+    if (todoCount) {
+        todoCount.textContent =
+            grouped["To Do"].length;
     }
 
-
-    if (elements.todoTasks) {
-
-        elements.todoTasks.textContent =
-            String(summary.todoTasks || 0);
+    if (inProgressCount) {
+        inProgressCount.textContent =
+            grouped["In Progress"].length;
     }
 
-
-    if (elements.inProgressTasks) {
-
-        elements.inProgressTasks.textContent =
-            String(summary.inProgressTasks || 0);
+    if (inReviewCount) {
+        inReviewCount.textContent =
+            grouped["In Review"].length;
     }
 
-
-    if (elements.inReviewTasks) {
-
-        elements.inReviewTasks.textContent =
-            String(summary.inReviewTasks || 0);
+    if (doneCount) {
+        doneCount.textContent =
+            grouped["Done"].length;
     }
+}
 
 
-    if (elements.doneTasks) {
+// ========================================
+// ADMIN USER SELECT
+// ========================================
 
-        elements.doneTasks.textContent =
-            String(summary.doneTasks || 0);
-    }
+export function renderUserSelect(
+    select,
+    users = []
+) {
+    if (!select) return;
+
+    select.innerHTML = `
+        <option value="">
+            Select a user
+        </option>
+    `;
+
+    users.forEach(user => {
+        const option =
+            document.createElement("option");
+
+        option.value = user.id;
+
+        option.textContent =
+            `${user.name} (${user.email})`;
+
+        select.appendChild(option);
+    });
 }
