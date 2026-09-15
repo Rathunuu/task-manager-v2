@@ -1,11 +1,7 @@
-// ========================================
-// APP.JS
-// Task Manager V2
-// Week 2 + Week 3 + Master Admin
-// ========================================
-
 import {
     loadUsers,
+    saveUsers,
+    findUserByEmail,
     registerUser,
     loginUser,
     getCurrentUser,
@@ -15,15 +11,18 @@ import {
     loadTasks,
     saveTasks,
     createTask,
+    createAssignedTask,
+    updateTask,
     deleteTask,
+    undoDeleteTask,
     loadProjects,
     saveProjects,
     createProject,
-    ensureDefaultProject,
+    updateProject,
     deleteProject,
-    createAssignedTask,
-    getUserDataForExport,
-    importUserData
+    ensureDefaultProject,
+    exportTasks,
+    importTasks
 } from "./storage.js";
 
 import {
@@ -41,73 +40,89 @@ import {
     renderUserSelect
 } from "./render.js";
 
-
-// ========================================
-// STATE
-// ========================================
+const $ = (id) => document.getElementById(id);
 
 let currentUser = null;
-
 let tasks = [];
 let projects = [];
-
-let activeProjectId = "";
+let activeProjectId = null;
 
 let currentView = "list";
-let currentCategory = "All";
-let searchText = "";
-let sortValue = "newest";
+let currentCategory = "all";
+let currentSearch = "";
+let currentSort = "newest";
 
 let selectedTaskId = null;
-
 let deletedTaskBackup = null;
 let undoTimer = null;
 
 
-// ========================================
-// DOM HELPERS
-// ========================================
+/* =========================================================
+   INITIAL LOAD
+========================================================= */
 
-const $ = id => document.getElementById(id);
+document.addEventListener("DOMContentLoaded", () => {
 
-const authScreen = $("authScreen");
-const loginSection = $("loginSection");
-const registerSection = $("registerSection");
+    bindAuthEvents();
+    bindAppEvents();
+    bindAdminEvents();
 
-const appScreen = $("appScreen");
-const adminDashboard = $("adminDashboard");
-const userTaskManager = $("userTaskManager");
+    const savedUser = getCurrentUser();
 
-
-// ========================================
-// INITIALIZE
-// ========================================
-
-document.addEventListener("DOMContentLoaded", init);
-
-function init() {
-
-    attachAuthEvents();
-    attachUserEvents();
-    attachAdminEvents();
-    attachDialogEvents();
-    attachKeyboardEvents();
-
-    const session = getCurrentUser();
-
-    if (session) {
-        openApplication(session);
+    if (savedUser) {
+        currentUser = savedUser;
+        openApplication(savedUser);
     } else {
-        showLogin();
+        showAuthScreen();
+    }
+});
+
+
+/* =========================================================
+   COMMON HELPERS
+========================================================= */
+
+function show(element, visible = true) {
+    if (!element) return;
+
+    element.hidden = !visible;
+}
+
+function showAuthScreen() {
+    show($("authScreen"), true);
+    show($("appScreen"), false);
+    show($("loginSection"), true);
+    show($("registerSection"), false);
+}
+
+function showRegisterScreen() {
+    show($("loginSection"), false);
+    show($("registerSection"), true);
+
+    $("registerName")?.focus();
+}
+
+function showLoginScreen() {
+    show($("registerSection"), false);
+    show($("loginSection"), true);
+
+    $("loginEmail")?.focus();
+}
+
+function clearError(id) {
+    const element = $(id);
+
+    if (element) {
+        element.textContent = "";
     }
 }
 
 
-// ========================================
-// AUTH EVENTS
-// ========================================
+/* =========================================================
+   AUTH EVENTS
+========================================================= */
 
-function attachAuthEvents() {
+function bindAuthEvents() {
 
     $("loginForm")?.addEventListener(
         "submit",
@@ -121,24 +136,19 @@ function attachAuthEvents() {
 
     $("showRegisterBtn")?.addEventListener(
         "click",
-        showRegister
+        showRegisterScreen
     );
 
     $("showLoginBtn")?.addEventListener(
         "click",
-        showLogin
-    );
-
-    $("logoutBtn")?.addEventListener(
-        "click",
-        handleLogout
+        showLoginScreen
     );
 }
 
 
-// ========================================
-// LOGIN
-// ========================================
+/* =========================================================
+   LOGIN
+========================================================= */
 
 function handleLogin(event) {
 
@@ -156,23 +166,34 @@ function handleLogin(event) {
     error.textContent = "";
 
     if (!email || !password) {
-
         error.textContent =
             "Please enter email and password.";
-
         return;
     }
 
-    const user =
+    const result =
         loginUser(email, password);
 
-    if (!user) {
+    if (!result || !result.success) {
 
         error.textContent =
+            result?.message ||
             "Invalid email or password.";
 
         return;
     }
+
+    const user = result.user;
+
+    if (!user) {
+
+        error.textContent =
+            "Login failed. User data not found.";
+
+        return;
+    }
+
+    currentUser = user;
 
     setCurrentUser(user);
 
@@ -180,9 +201,9 @@ function handleLogin(event) {
 }
 
 
-// ========================================
-// REGISTER
-// ========================================
+/* =========================================================
+   REGISTER
+========================================================= */
 
 function handleRegister(event) {
 
@@ -213,7 +234,7 @@ function handleRegister(event) {
     if (password.length < 4) {
 
         error.textContent =
-            "Password must contain at least 4 characters.";
+            "Password must be at least 4 characters.";
 
         return;
     }
@@ -236,130 +257,293 @@ function handleRegister(event) {
 
     const user = result.user;
 
-    setCurrentUser(user);
+    currentUser = user;
 
-    $("registerForm").reset();
+    setCurrentUser(user);
 
     openApplication(user);
 }
 
 
-// ========================================
-// SHOW LOGIN
-// ========================================
-
-function showLogin() {
-
-    authScreen.hidden = false;
-
-    loginSection.hidden = false;
-    registerSection.hidden = true;
-
-    appScreen.hidden = true;
-
-    $("loginError").textContent = "";
-}
-
-
-// ========================================
-// SHOW REGISTER
-// ========================================
-
-function showRegister() {
-
-    authScreen.hidden = false;
-
-    loginSection.hidden = true;
-    registerSection.hidden = false;
-
-    appScreen.hidden = true;
-
-    $("registerError").textContent = "";
-}
-
-
-// ========================================
-// LOGOUT
-// ========================================
-
-function handleLogout() {
-
-    clearCurrentUser();
-
-    currentUser = null;
-
-    tasks = [];
-    projects = [];
-
-    activeProjectId = "";
-
-    selectedTaskId = null;
-
-    showLogin();
-
-    $("loginForm")?.reset();
-}
-
-
-// ========================================
-// OPEN APPLICATION
-// ========================================
+/* =========================================================
+   OPEN APPLICATION
+========================================================= */
 
 function openApplication(user) {
 
     currentUser = user;
 
-    authScreen.hidden = true;
-    appScreen.hidden = false;
+    show($("authScreen"), false);
+    show($("appScreen"), true);
 
-    $("welcomeMessage").textContent =
-        `Welcome, ${user.name}`;
+    if ($("welcomeMessage")) {
 
-    $("currentUserRole").textContent =
-        user.role === "admin"
-            ? "Master Admin"
-            : "User";
+        $("welcomeMessage").textContent =
+            `Welcome, ${user.name}`;
+    }
+
+    if ($("currentUserRole")) {
+
+        $("currentUserRole").textContent =
+            isAdmin(user)
+                ? "Master Admin"
+                : "User";
+    }
 
     if (isAdmin(user)) {
 
-        adminDashboard.hidden = false;
-        userTaskManager.hidden = true;
+        show($("adminDashboard"), true);
+        show($("userTaskManager"), false);
 
         loadAdminDashboard();
 
     } else {
 
-        adminDashboard.hidden = true;
-        userTaskManager.hidden = false;
+        show($("adminDashboard"), false);
+        show($("userTaskManager"), true);
 
         loadUserDashboard();
     }
 }
 
 
-// ========================================
-// USER DASHBOARD
-// ========================================
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+function handleLogout() {
+
+    clearCurrentUser();
+
+    currentUser = null;
+    tasks = [];
+    projects = [];
+    activeProjectId = null;
+
+    show($("appScreen"), false);
+    show($("authScreen"), true);
+
+    showLoginScreen();
+
+    if ($("loginForm")) {
+        $("loginForm").reset();
+    }
+}
+
+
+/* =========================================================
+   APP EVENTS
+========================================================= */
+
+function bindAppEvents() {
+
+    $("logoutBtn")?.addEventListener(
+        "click",
+        handleLogout
+    );
+
+    $("addTaskBtn")?.addEventListener(
+        "click",
+        handleAddTask
+    );
+
+    $("searchInput")?.addEventListener(
+        "input",
+        handleSearch
+    );
+
+    $("sortSelect")?.addEventListener(
+        "change",
+        handleSort
+    );
+
+    document
+        .querySelectorAll("[data-category]")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    currentCategory =
+                        button.dataset.category;
+
+                    document
+                        .querySelectorAll("[data-category]")
+                        .forEach(btn =>
+                            btn.classList.remove("active")
+                        );
+
+                    button.classList.add("active");
+
+                    refreshTaskUI();
+                }
+            );
+        });
+
+    $("listViewBtn")?.addEventListener(
+        "click",
+        () => switchView("list")
+    );
+
+    $("boardViewBtn")?.addEventListener(
+        "click",
+        () => switchView("board")
+    );
+
+    $("exportBtn")?.addEventListener(
+        "click",
+        handleExport
+    );
+
+    $("importFileInput")?.addEventListener(
+        "change",
+        handleImport
+    );
+
+    $("closeTaskDetailBtn")?.addEventListener(
+        "click",
+        closeTaskDetail
+    );
+
+    $("closeTaskDetailBtnBottom")?.addEventListener(
+        "click",
+        closeTaskDetail
+    );
+
+    $("saveNotesBtn")?.addEventListener(
+        "click",
+        saveTaskNotes
+    );
+
+    $("addSubtaskBtn")?.addEventListener(
+        "click",
+        addSubtask
+    );
+
+    $("closeNewProjectBtn")?.addEventListener(
+        "click",
+        closeNewProjectDialog
+    );
+
+    $("cancelProjectBtn")?.addEventListener(
+        "click",
+        closeNewProjectDialog
+    );
+
+    $("createProjectBtn")?.addEventListener(
+        "click",
+        createNewProject
+    );
+
+    $("undoBtn")?.addEventListener(
+        "click",
+        handleUndo
+    );
+
+
+    /* Task list buttons */
+
+    $("taskList")?.addEventListener(
+        "click",
+        handleTaskListClick
+    );
+
+
+    /* Kanban buttons */
+
+    $("kanbanBoard")?.addEventListener(
+        "click",
+        handleTaskListClick
+    );
+
+
+    /* Project switch */
+
+    $("projectSwitcher")?.addEventListener(
+        "click",
+        event => {
+
+            const button =
+                event.target.closest(
+                    "[data-project-id]"
+                );
+
+            if (!button) return;
+
+            activeProjectId =
+                button.dataset.projectId;
+
+            saveActiveProject();
+
+            refreshTaskUI();
+        }
+    );
+
+
+    /* New project */
+
+    document.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target.closest(
+                    "#newProjectBtn"
+                )
+            ) {
+
+                openNewProjectDialog();
+            }
+        }
+    );
+
+
+    /* Keyboard shortcuts */
+
+    document.addEventListener(
+        "keydown",
+        handleKeyboardShortcuts
+    );
+}
+
+
+/* =========================================================
+   USER DASHBOARD
+========================================================= */
 
 function loadUserDashboard() {
 
+    if (!currentUser) return;
+
+    ensureDefaultProject(
+        currentUser.id
+    );
+
     projects =
-        ensureDefaultProject(
+        loadProjects(
             currentUser.id
         );
 
     tasks =
-        loadTasks(currentUser.id);
+        loadTasks(
+            currentUser.id
+        );
 
     if (!projects.length) {
 
+        ensureDefaultProject(
+            currentUser.id
+        );
+
         projects =
-            ensureDefaultProject(
+            loadProjects(
                 currentUser.id
             );
     }
 
-    if (!activeProjectId ||
+    if (
+        !activeProjectId ||
         !projects.some(
             project =>
                 project.id === activeProjectId
@@ -367,18 +551,18 @@ function loadUserDashboard() {
     ) {
 
         activeProjectId =
-            projects[0]?.id || "";
+            projects[0]?.id || null;
     }
 
-    renderUserDashboard();
+    renderUserInterface();
 }
 
 
-// ========================================
-// RENDER USER DASHBOARD
-// ========================================
+/* =========================================================
+   RENDER USER INTERFACE
+========================================================= */
 
-function renderUserDashboard() {
+function renderUserInterface() {
 
     renderProjects(
         $("projectSwitcher"),
@@ -392,22 +576,108 @@ function renderUserDashboard() {
                 project.id === activeProjectId
         );
 
-    $("activeProjectName").textContent =
-        activeProject?.name ||
-        "My Tasks";
+    if ($("activeProjectName")) {
 
-    const projectTasks =
-        getActiveProjectTasks();
+        $("activeProjectName").textContent =
+            activeProject?.name ||
+            "My Project";
+    }
+
+    refreshTaskUI();
+}
+
+
+/* =========================================================
+   TASK FILTERING
+========================================================= */
+
+function getFilteredTasks() {
+
+    let filtered =
+        tasks.filter(
+            task =>
+                task.projectId === activeProjectId
+        );
+
+    if (currentCategory !== "all") {
+
+        filtered =
+            filtered.filter(
+                task =>
+                    task.category === currentCategory
+            );
+    }
+
+    if (currentSearch) {
+
+        const search =
+            currentSearch.toLowerCase();
+
+        filtered =
+            filtered.filter(task => {
+
+                return (
+                    task.title
+                        ?.toLowerCase()
+                        .includes(search) ||
+
+                    task.description
+                        ?.toLowerCase()
+                        .includes(search)
+                );
+            });
+    }
+
+    filtered.sort(
+        (a, b) => {
+
+            if (currentSort === "oldest") {
+
+                return (
+                    new Date(a.createdAt) -
+                    new Date(b.createdAt)
+                );
+            }
+
+            if (currentSort === "az") {
+
+                return (
+                    (a.title || "")
+                        .localeCompare(
+                            b.title || ""
+                        )
+                );
+            }
+
+            if (currentSort === "za") {
+
+                return (
+                    (b.title || "")
+                        .localeCompare(
+                            a.title || ""
+                        )
+                );
+            }
+
+            return (
+                new Date(b.createdAt) -
+                new Date(a.createdAt)
+            );
+        }
+    );
+
+    return filtered;
+}
+
+
+/* =========================================================
+   REFRESH TASK UI
+========================================================= */
+
+function refreshTaskUI() {
 
     const filteredTasks =
-        getFilteredTasks(projectTasks);
-
-    renderProgress(
-        $("progressText"),
-        $("progressFill"),
-        $("progressPercentage"),
-        projectTasks
-    );
+        getFilteredTasks();
 
     renderTasks(
         $("taskList"),
@@ -419,313 +689,38 @@ function renderUserDashboard() {
         filteredTasks.length > 0
     );
 
+    renderProgress(
+        $("progressText"),
+        $("progressFill"),
+        $("progressPercentage"),
+        filteredTasks
+    );
+
     renderBoard(
         filteredTasks,
         {
             todo: $("todoColumn"),
             inProgress: $("inProgressColumn"),
             inReview: $("inReviewColumn"),
-            done: $("doneColumn"),
-
-            todoCount: $("todoCount"),
-            inProgressCount: $("inProgressCount"),
-            inReviewCount: $("inReviewCount"),
-            doneCount: $("doneCount")
+            done: $("doneColumn")
         }
     );
 
-    updateViewButtons();
-    updateViewVisibility();
-}
-
-
-// ========================================
-// ACTIVE PROJECT TASKS
-// ========================================
-
-function getActiveProjectTasks() {
-
-    if (!activeProjectId) {
-        return tasks;
-    }
-
-    const projectTasks =
-        tasks.filter(
-            task =>
-                task.projectId ===
-                activeProjectId
-        );
-
-    /*
-       Tasks created by Admin without
-       a project are shown in the
-       default project.
-    */
-
-    if (
-        projects.length &&
-        activeProjectId === projects[0].id
-    ) {
-
-        return tasks.filter(
-            task =>
-                task.projectId ===
-                    activeProjectId ||
-                !task.projectId
-        );
-    }
-
-    return projectTasks;
-}
-
-
-// ========================================
-// FILTER + SEARCH + SORT
-// ========================================
-
-function getFilteredTasks(sourceTasks) {
-
-    let result = [...sourceTasks];
-
-    // Category
-    if (currentCategory !== "All") {
-
-        result =
-            result.filter(
-                task =>
-                    task.category ===
-                    currentCategory
-            );
-    }
-
-    // Search
-    if (searchText) {
-
-        const query =
-            searchText.toLowerCase();
-
-        result =
-            result.filter(task => {
-
-                const title =
-                    String(
-                        task.title || ""
-                    ).toLowerCase();
-
-                const description =
-                    String(
-                        task.description || ""
-                    ).toLowerCase();
-
-                const category =
-                    String(
-                        task.category || ""
-                    ).toLowerCase();
-
-                return (
-                    title.includes(query) ||
-                    description.includes(query) ||
-                    category.includes(query)
-                );
-            });
-    }
-
-    // Sort
-    result.sort(
-        (a, b) => {
-
-            if (sortValue === "newest") {
-
-                return (
-                    new Date(
-                        b.createdAt || 0
-                    ) -
-                    new Date(
-                        a.createdAt || 0
-                    )
-                );
-            }
-
-            if (sortValue === "oldest") {
-
-                return (
-                    new Date(
-                        a.createdAt || 0
-                    ) -
-                    new Date(
-                        b.createdAt || 0
-                    )
-                );
-            }
-
-            if (sortValue === "title") {
-
-                return String(
-                    a.title || ""
-                ).localeCompare(
-                    String(
-                        b.title || ""
-                    )
-                );
-            }
-
-            if (sortValue === "priority") {
-
-                const priorityOrder = {
-                    High: 1,
-                    Medium: 2,
-                    Low: 3
-                };
-
-                return (
-                    (priorityOrder[a.priority] || 2) -
-                    (priorityOrder[b.priority] || 2)
-                );
-            }
-
-            return 0;
-        }
-    );
-
-    return result;
-}
-
-
-// ========================================
-// USER EVENTS
-// ========================================
-
-function attachUserEvents() {
-
-    $("addTaskBtn")?.addEventListener(
-        "click",
-        handleAddTask
-    );
-
-    $("searchInput")?.addEventListener(
-        "input",
-        event => {
-
-            searchText =
-                event.target.value.trim();
-
-            renderUserDashboard();
-        }
-    );
-
-    $("sortSelect")?.addEventListener(
-        "change",
-        event => {
-
-            sortValue =
-                event.target.value;
-
-            renderUserDashboard();
-        }
-    );
-
-    document
-        .querySelectorAll("[data-category]")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    currentCategory =
-                        button.dataset.category ||
-                        "All";
-
-                    document
-                        .querySelectorAll(
-                            "[data-category]"
-                        )
-                        .forEach(item =>
-                            item.classList.remove(
-                                "active"
-                            )
-                        );
-
-                    button.classList.add(
-                        "active"
-                    );
-
-                    renderUserDashboard();
-                }
-            );
-        });
-
-    $("listViewBtn")?.addEventListener(
-        "click",
-        () => {
-
-            currentView = "list";
-
-            updateViewButtons();
-            updateViewVisibility();
-        }
-    );
-
-    $("boardViewBtn")?.addEventListener(
-        "click",
-        () => {
-
-            currentView = "board";
-
-            updateViewButtons();
-            updateViewVisibility();
-        }
-    );
-
-    $("projectSwitcher")?.addEventListener(
-        "click",
-        handleProjectClick
-    );
-
-    $("exportBtn")?.addEventListener(
-        "click",
-        handleExport
-    );
-
-    $("importFileInput")?.addEventListener(
-        "change",
-        handleImport
-    );
-
-    $("createProjectBtn")?.addEventListener(
-        "click",
-        handleCreateProject
-    );
-
-    $("cancelProjectBtn")?.addEventListener(
-        "click",
-        closeNewProjectDialog
-    );
-
-    $("closeNewProjectBtn")?.addEventListener(
-        "click",
-        closeNewProjectDialog
-    );
-
-    $("taskList")?.addEventListener(
-        "click",
-        handleTaskListClick
-    );
-
-    $("kanbanBoard")?.addEventListener(
-        "click",
-        handleTaskBoardClick
+    updateKanbanCounts(
+        filteredTasks
     );
 
     attachDragAndDrop();
 }
 
 
-// ========================================
-// ADD TASK
-// ========================================
+/* =========================================================
+   ADD TASK
+========================================================= */
 
 function handleAddTask() {
+
+    if (!currentUser) return;
 
     const input =
         $("taskInput");
@@ -741,28 +736,25 @@ function handleAddTask() {
     }
 
     const category =
-        $("categorySelect").value ||
-        "Personal";
+        $("categorySelect")?.value ||
+        "Work";
 
     const status =
-        $("statusSelect").value ||
-        "To Do";
+        $("statusSelect")?.value ||
+        "todo";
 
-    const task =
+    const newTask =
         createTask(
             currentUser.id,
             {
                 title,
-                description: "",
                 category,
                 status,
-                priority: "Medium",
-                dueDate: "",
                 projectId: activeProjectId
             }
         );
 
-    tasks.push(task);
+    tasks.push(newTask);
 
     saveTasks(
         currentUser.id,
@@ -771,42 +763,129 @@ function handleAddTask() {
 
     input.value = "";
 
+    refreshTaskUI();
+
     input.focus();
-
-    renderUserDashboard();
 }
 
 
-// ========================================
-// PROJECT CLICK
-// ========================================
+/* =========================================================
+   SEARCH
+========================================================= */
 
-function handleProjectClick(event) {
+function handleSearch(event) {
 
-    const item =
-        event.target.closest(
-            "[data-project-id]"
-        );
+    currentSearch =
+        event.target.value.trim();
 
-    if (!item) return;
+    refreshTaskUI();
+}
 
-    activeProjectId =
-        item.dataset.projectId;
 
-    currentCategory = "All";
-    searchText = "";
+/* =========================================================
+   SORT
+========================================================= */
 
-    if ($("searchInput")) {
-        $("searchInput").value = "";
+function handleSort(event) {
+
+    currentSort =
+        event.target.value;
+
+    refreshTaskUI();
+}
+
+
+/* =========================================================
+   VIEW SWITCH
+========================================================= */
+
+function switchView(view) {
+
+    currentView = view;
+
+    const listView =
+        $("taskList");
+
+    const boardView =
+        $("kanbanBoard");
+
+    if (view === "list") {
+
+        show(listView, true);
+        show(boardView, false);
+
+        $("listViewBtn")
+            ?.classList.add("active");
+
+        $("boardViewBtn")
+            ?.classList.remove("active");
+
+    } else {
+
+        show(listView, false);
+        show(boardView, true);
+
+        $("boardViewBtn")
+            ?.classList.add("active");
+
+        $("listViewBtn")
+            ?.classList.remove("active");
     }
-
-    renderUserDashboard();
 }
 
 
-// ========================================
-// TASK LIST CLICK
-// ========================================
+/* =========================================================
+   KANBAN COUNTS
+========================================================= */
+
+function updateKanbanCounts(taskList) {
+
+    const counts = {
+        todo: 0,
+        inProgress: 0,
+        inReview: 0,
+        done: 0
+    };
+
+    taskList.forEach(task => {
+
+        if (task.status === "todo") {
+            counts.todo++;
+        }
+
+        if (task.status === "in-progress") {
+            counts.inProgress++;
+        }
+
+        if (task.status === "in-review") {
+            counts.inReview++;
+        }
+
+        if (task.status === "done") {
+            counts.done++;
+        }
+    });
+
+    if ($("todoCount"))
+        $("todoCount").textContent = counts.todo;
+
+    if ($("inProgressCount"))
+        $("inProgressCount").textContent =
+            counts.inProgress;
+
+    if ($("inReviewCount"))
+        $("inReviewCount").textContent =
+            counts.inReview;
+
+    if ($("doneCount"))
+        $("doneCount").textContent =
+            counts.done;
+}
+
+
+/* =========================================================
+   TASK CLICK HANDLER
+========================================================= */
 
 function handleTaskListClick(event) {
 
@@ -817,9 +896,10 @@ function handleTaskListClick(event) {
 
     if (deleteButton) {
 
-        deleteUserTask(
-            deleteButton.dataset.deleteTask
-        );
+        const taskId =
+            deleteButton.dataset.deleteTask;
+
+        handleDeleteTask(taskId);
 
         return;
     }
@@ -831,346 +911,42 @@ function handleTaskListClick(event) {
 
     if (openButton) {
 
-        openTaskDetail(
-            openButton.dataset.openTask
-        );
-    }
-}
+        const taskId =
+            openButton.dataset.openTask;
 
-
-// ========================================
-// KANBAN CLICK
-// ========================================
-
-function handleTaskBoardClick(event) {
-
-    const deleteButton =
-        event.target.closest(
-            "[data-delete-task]"
-        );
-
-    if (deleteButton) {
-
-        deleteUserTask(
-            deleteButton.dataset.deleteTask
-        );
+        openTaskDetail(taskId);
 
         return;
     }
 
-    const openButton =
+    const statusButton =
         event.target.closest(
-            "[data-open-task]"
+            "[data-status-task]"
         );
 
-    if (openButton) {
+    if (statusButton) {
 
-        openTaskDetail(
-            openButton.dataset.openTask
+        const taskId =
+            statusButton.dataset.statusTask;
+
+        const status =
+            statusButton.dataset.status;
+
+        changeTaskStatus(
+            taskId,
+            status
         );
     }
 }
 
 
-// ========================================
-// DELETE TASK
-// ========================================
-
-function deleteUserTask(taskId) {
-
-    const index =
-        tasks.findIndex(
-            task =>
-                task.id === taskId
-        );
-
-    if (index === -1) return;
-
-    deletedTaskBackup = {
-        task: {
-            ...tasks[index]
-        },
-        index
-    };
-
-    tasks.splice(index, 1);
-
-    saveTasks(
-        currentUser.id,
-        tasks
-    );
-
-    showUndoToast();
-
-    renderUserDashboard();
-}
-
-
-// ========================================
-// UNDO
-// ========================================
-
-function showUndoToast() {
-
-    const toast =
-        $("undoToast");
-
-    const message =
-        $("undoMessage");
-
-    if (!toast) return;
-
-    if (message) {
-        message.textContent =
-            "Task deleted — Undo";
-    }
-
-    toast.hidden = false;
-
-    clearTimeout(undoTimer);
-
-    undoTimer =
-        setTimeout(
-            () => {
-
-                toast.hidden = true;
-
-                deletedTaskBackup = null;
-
-            },
-            5000
-        );
-}
-
-
-// ========================================
-// UNDO BUTTON
-// ========================================
-
-function attachUndoEvent() {
-
-    $("undoBtn")?.addEventListener(
-        "click",
-        () => {
-
-            if (!deletedTaskBackup) {
-                return;
-            }
-
-            const {
-                task,
-                index
-            } = deletedTaskBackup;
-
-            tasks.splice(
-                Math.min(index, tasks.length),
-                0,
-                task
-            );
-
-            saveTasks(
-                currentUser.id,
-                tasks
-            );
-
-            deletedTaskBackup = null;
-
-            clearTimeout(undoTimer);
-
-            $("undoToast").hidden = true;
-
-            renderUserDashboard();
-        }
-    );
-}
-
-
-// ========================================
-// VIEW SWITCH
-// ========================================
-
-function updateViewButtons() {
-
-    $("listViewBtn")
-        ?.classList.toggle(
-            "active",
-            currentView === "list"
-        );
-
-    $("boardViewBtn")
-        ?.classList.toggle(
-            "active",
-            currentView === "board"
-        );
-}
-
-function updateViewVisibility() {
-
-    const list =
-        $("taskList");
-
-    const empty =
-        $("emptyState");
-
-    const board =
-        $("kanbanBoard");
-
-    if (currentView === "list") {
-
-        if (list) list.hidden = false;
-        if (empty) empty.hidden = false;
-        if (board) board.hidden = true;
-
-    } else {
-
-        if (list) list.hidden = true;
-        if (empty) empty.hidden = true;
-        if (board) board.hidden = false;
-    }
-}
-
-
-// ========================================
-// DRAG AND DROP
-// ========================================
-
-function attachDragAndDrop() {
-
-    document.addEventListener(
-        "dragstart",
-        event => {
-
-            const card =
-                event.target.closest(
-                    ".task-card"
-                );
-
-            if (!card) return;
-
-            card.classList.add(
-                "dragging"
-            );
-
-            event.dataTransfer.setData(
-                "text/plain",
-                card.dataset.taskId
-            );
-        }
-    );
-
-    document.addEventListener(
-        "dragend",
-        event => {
-
-            const card =
-                event.target.closest(
-                    ".task-card"
-                );
-
-            if (!card) return;
-
-            card.classList.remove(
-                "dragging"
-            );
-        }
-    );
-
-    document.addEventListener(
-        "dragover",
-        event => {
-
-            const column =
-                event.target.closest(
-                    ".kanban-column"
-                );
-
-            if (!column) return;
-
-            event.preventDefault();
-        }
-    );
-
-    document.addEventListener(
-        "drop",
-        event => {
-
-            const column =
-                event.target.closest(
-                    ".kanban-column"
-                );
-
-            if (!column) return;
-
-            event.preventDefault();
-
-            const taskId =
-                event.dataTransfer.getData(
-                    "text/plain"
-                );
-
-            if (!taskId) return;
-
-            const newStatus =
-                getStatusFromColumn(
-                    column
-                );
-
-            if (!newStatus) return;
-
-            updateTaskStatus(
-                taskId,
-                newStatus
-            );
-        }
-    );
-}
-
-
-// ========================================
-// STATUS FROM COLUMN
-// ========================================
-
-function getStatusFromColumn(column) {
-
-    if (
-        column.id === "todoColumn" ||
-        column.id === "adminTodoColumn"
-    ) {
-        return "To Do";
-    }
-
-    if (
-        column.id === "inProgressColumn" ||
-        column.id === "adminInProgressColumn"
-    ) {
-        return "In Progress";
-    }
-
-    if (
-        column.id === "inReviewColumn" ||
-        column.id === "adminInReviewColumn"
-    ) {
-        return "In Review";
-    }
-
-    if (
-        column.id === "doneColumn" ||
-        column.id === "adminDoneColumn"
-    ) {
-        return "Done";
-    }
-
-    return null;
-}
-
-
-// ========================================
-// UPDATE USER TASK STATUS
-// ========================================
-
-function updateTaskStatus(
+/* =========================================================
+   CHANGE TASK STATUS
+========================================================= */
+
+function changeTaskStatus(
     taskId,
-    newStatus
+    status
 ) {
 
     const task =
@@ -1181,10 +957,7 @@ function updateTaskStatus(
 
     if (!task) return;
 
-    task.status = newStatus;
-
-    task.completed =
-        newStatus === "Done";
+    task.status = status;
 
     task.updatedAt =
         new Date().toISOString();
@@ -1194,59 +967,13 @@ function updateTaskStatus(
         tasks
     );
 
-    renderUserDashboard();
+    refreshTaskUI();
 }
 
 
-// ========================================
-// TASK DETAIL DIALOG
-// ========================================
-
-function attachDialogEvents() {
-
-    attachUndoEvent();
-
-    $("closeTaskDetailBtn")
-        ?.addEventListener(
-            "click",
-            closeTaskDetail
-        );
-
-    $("closeTaskDetailBtnBottom")
-        ?.addEventListener(
-            "click",
-            closeTaskDetail
-        );
-
-    $("saveNotesBtn")
-        ?.addEventListener(
-            "click",
-            saveTaskDetails
-        );
-
-    $("addSubtaskBtn")
-        ?.addEventListener(
-            "click",
-            addSubtask
-        );
-
-    $("subtaskList")
-        ?.addEventListener(
-            "click",
-            handleSubtaskClick
-        );
-
-    $("subtaskList")
-        ?.addEventListener(
-            "change",
-            handleSubtaskChange
-        );
-}
-
-
-// ========================================
-// OPEN TASK DETAIL
-// ========================================
+/* =========================================================
+   TASK DETAIL
+========================================================= */
 
 function openTaskDetail(taskId) {
 
@@ -1258,7 +985,8 @@ function openTaskDetail(taskId) {
 
     if (!task) return;
 
-    selectedTaskId = taskId;
+    selectedTaskId =
+        taskId;
 
     renderTaskDetail(
         task,
@@ -1281,66 +1009,54 @@ function openTaskDetail(taskId) {
     const dialog =
         $("taskDetailDialog");
 
-    if (dialog) {
-
-        if (typeof dialog.showModal === "function") {
-            dialog.showModal();
-        } else {
-            dialog.hidden = false;
-        }
+    if (dialog?.showModal) {
+        dialog.showModal();
+    } else {
+        show(dialog, true);
     }
 }
 
 
-// ========================================
-// CLOSE TASK DETAIL
-// ========================================
+/* =========================================================
+   CLOSE DETAIL
+========================================================= */
 
 function closeTaskDetail() {
 
     const dialog =
         $("taskDetailDialog");
 
-    if (!dialog) return;
+    if (dialog?.open) {
 
-    if (
-        typeof dialog.close === "function"
-    ) {
         dialog.close();
+
     } else {
-        dialog.hidden = true;
+
+        show(dialog, false);
     }
 
     selectedTaskId = null;
 }
 
 
-// ========================================
-// SAVE TASK DETAILS
-// ========================================
+/* =========================================================
+   SAVE TASK NOTES
+========================================================= */
 
-function saveTaskDetails() {
+function saveTaskNotes() {
 
     if (!selectedTaskId) return;
 
     const task =
         tasks.find(
             item =>
-                item.id ===
-                selectedTaskId
+                item.id === selectedTaskId
         );
 
     if (!task) return;
 
-    task.title =
-        $("detailTaskTitle").value.trim() ||
-        task.title;
-
-    task.description =
-        $("detailDescription").value.trim();
-
     task.notes =
-        $("taskNotes").value;
+        $("taskNotes")?.value || "";
 
     task.updatedAt =
         new Date().toISOString();
@@ -1350,15 +1066,13 @@ function saveTaskDetails() {
         tasks
     );
 
-    renderUserDashboard();
-
-    closeTaskDetail();
+    refreshTaskUI();
 }
 
 
-// ========================================
-// ADD SUBTASK
-// ========================================
+/* =========================================================
+   ADD SUBTASK
+========================================================= */
 
 function addSubtask() {
 
@@ -1375,8 +1089,7 @@ function addSubtask() {
     const task =
         tasks.find(
             item =>
-                item.id ===
-                selectedTaskId
+                item.id === selectedTaskId
         );
 
     if (!task) return;
@@ -1386,9 +1099,13 @@ function addSubtask() {
     }
 
     task.subtasks.push({
-        id: createId(),
+        id:
+            "subtask-" +
+            Date.now(),
+
         title,
-        completed: false
+
+        done: false
     });
 
     saveTasks(
@@ -1405,102 +1122,190 @@ function addSubtask() {
 }
 
 
-// ========================================
-// SUBTASK CLICK
-// ========================================
+/* =========================================================
+   DELETE TASK
+========================================================= */
 
-function handleSubtaskClick(event) {
-
-    const button =
-        event.target.closest(
-            "[data-delete-subtask]"
-        );
-
-    if (!button) return;
-
-    if (!selectedTaskId) return;
+function handleDeleteTask(taskId) {
 
     const task =
         tasks.find(
             item =>
-                item.id ===
-                selectedTaskId
+                item.id === taskId
         );
 
     if (!task) return;
 
-    task.subtasks =
-        (task.subtasks || [])
-            .filter(
-                subtask =>
-                    subtask.id !==
-                    button.dataset.deleteSubtask
-            );
+    deletedTaskBackup = {
+        ...task,
+        subtasks: [
+            ...(task.subtasks || [])
+        ]
+    };
+
+    tasks =
+        tasks.filter(
+            item =>
+                item.id !== taskId
+        );
 
     saveTasks(
         currentUser.id,
         tasks
     );
 
-    renderSubtasks(
-        $("subtaskList"),
-        task.subtasks
+    showUndoToast(
+        "Task deleted — Undo"
     );
+
+    refreshTaskUI();
 }
 
 
-// ========================================
-// SUBTASK CHANGE
-// ========================================
+/* =========================================================
+   UNDO DELETE
+========================================================= */
 
-function handleSubtaskChange(event) {
+function showUndoToast(message) {
 
-    const checkbox =
-        event.target.closest(
-            "[data-subtask-id]"
+    if ($("undoMessage")) {
+        $("undoMessage").textContent =
+            message;
+    }
+
+    show($("undoToast"), true);
+
+    clearTimeout(undoTimer);
+
+    undoTimer =
+        setTimeout(
+            () => {
+
+                deletedTaskBackup = null;
+
+                show(
+                    $("undoToast"),
+                    false
+                );
+
+            },
+            5000
         );
+}
 
-    if (!checkbox) return;
 
-    if (!selectedTaskId) return;
+function handleUndo() {
 
-    const task =
-        tasks.find(
-            item =>
-                item.id ===
-                selectedTaskId
-        );
+    if (!deletedTaskBackup) return;
 
-    if (!task) return;
-
-    const subtask =
-        (task.subtasks || [])
-            .find(
-                item =>
-                    item.id ===
-                    checkbox.dataset.subtaskId
-            );
-
-    if (!subtask) return;
-
-    subtask.completed =
-        checkbox.checked;
+    tasks.push(
+        deletedTaskBackup
+    );
 
     saveTasks(
         currentUser.id,
         tasks
     );
 
-    renderSubtasks(
-        $("subtaskList"),
-        task.subtasks
+    deletedTaskBackup = null;
+
+    clearTimeout(undoTimer);
+
+    show(
+        $("undoToast"),
+        false
     );
+
+    refreshTaskUI();
 }
 
 
-// ========================================
-// NEW PROJECT
-// ========================================
+/* =========================================================
+   DRAG & DROP
+========================================================= */
+
+function attachDragAndDrop() {
+
+    const cards =
+        document.querySelectorAll(
+            "#taskList .task-card, #kanbanBoard .task-card"
+        );
+
+    cards.forEach(card => {
+
+        card.draggable = true;
+
+        card.addEventListener(
+            "dragstart",
+            () => {
+
+                card.classList.add(
+                    "dragging"
+                );
+            }
+        );
+
+        card.addEventListener(
+            "dragend",
+            () => {
+
+                card.classList.remove(
+                    "dragging"
+                );
+            }
+        );
+    });
+
+    const columns =
+        document.querySelectorAll(
+            ".kanban-column"
+        );
+
+    columns.forEach(column => {
+
+        column.addEventListener(
+            "dragover",
+            event => {
+
+                event.preventDefault();
+            }
+        );
+
+        column.addEventListener(
+            "drop",
+            event => {
+
+                event.preventDefault();
+
+                const dragging =
+                    document.querySelector(
+                        ".task-card.dragging"
+                    );
+
+                if (!dragging) return;
+
+                const taskId =
+                    dragging.dataset.taskId;
+
+                const newStatus =
+                    column.dataset.status;
+
+                if (taskId && newStatus) {
+
+                    changeTaskStatus(
+                        taskId,
+                        newStatus
+                    );
+                }
+            }
+        );
+    });
+}
+
+
+/* =========================================================
+   PROJECTS
+========================================================= */
 
 function openNewProjectDialog() {
 
@@ -1509,71 +1314,43 @@ function openNewProjectDialog() {
 
     if (!dialog) return;
 
-    $("projectNameInput").value = "";
-    $("projectError").textContent = "";
+    show(dialog, true);
 
-    if (
-        typeof dialog.showModal === "function"
-    ) {
-        dialog.showModal();
-    } else {
-        dialog.hidden = false;
-    }
+    $("projectNameInput")?.focus();
 }
+
 
 function closeNewProjectDialog() {
 
     const dialog =
         $("newProjectDialog");
 
-    if (!dialog) return;
+    show(dialog, false);
 
-    if (
-        typeof dialog.close === "function"
-    ) {
-        dialog.close();
-    } else {
-        dialog.hidden = true;
+    if ($("projectNameInput")) {
+        $("projectNameInput").value = "";
     }
+
+    clearError(
+        "projectError"
+    );
 }
 
 
-// ========================================
-// CREATE PROJECT
-// ========================================
+function createNewProject() {
 
-function handleCreateProject() {
+    if (!currentUser) return;
 
     const input =
         $("projectNameInput");
 
-    const error =
-        $("projectError");
-
     const name =
         input.value.trim();
 
-    error.textContent = "";
-
     if (!name) {
 
-        error.textContent =
-            "Please enter project name.";
-
-        return;
-    }
-
-    const duplicate =
-        projects.some(
-            project =>
-                project.name.toLowerCase() ===
-                name.toLowerCase()
-        );
-
-    if (duplicate) {
-
-        error.textContent =
-            "Project already exists.";
+        $("projectError").textContent =
+            "Please enter a project name.";
 
         return;
     }
@@ -1594,216 +1371,136 @@ function handleCreateProject() {
     activeProjectId =
         project.id;
 
+    saveActiveProject();
+
     closeNewProjectDialog();
 
-    renderUserDashboard();
+    renderUserInterface();
 }
 
 
-// ========================================
-// NEW PROJECT BUTTON
-// ========================================
+/* =========================================================
+   ACTIVE PROJECT
+========================================================= */
 
-document.addEventListener(
-    "click",
-    event => {
+function saveActiveProject() {
 
-        if (
-            event.target.closest(
-                "#newProjectBtn"
-            )
-        ) {
-            openNewProjectDialog();
-        }
-    }
-);
+    if (!currentUser) return;
 
-
-// ========================================
-// EXPORT
-// ========================================
-
-function handleExport() {
-
-    const data =
-        getUserDataForExport(
-            currentUser.id
-        );
-
-    const blob =
-        new Blob(
-            [
-                JSON.stringify(
-                    data,
-                    null,
-                    2
-                )
-            ],
-            {
-                type: "application/json"
-            }
-        );
-
-    const url =
-        URL.createObjectURL(blob);
-
-    const link =
-        document.createElement("a");
-
-    link.href = url;
-
-    link.download =
-        "tasks.json";
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-    URL.revokeObjectURL(url);
-}
-
-
-// ========================================
-// IMPORT
-// ========================================
-
-async function handleImport(event) {
-
-    const file =
-        event.target.files?.[0];
-
-    if (!file) return;
-
-    try {
-
-        const text =
-            await file.text();
-
-        const data =
-            JSON.parse(text);
-
-        const result =
-            importUserData(
-                currentUser.id,
-                data
-            );
-
-        if (!result.success) {
-
-            alert(
-                result.message ||
-                "Import failed."
-            );
-
-            return;
-        }
-
-        tasks =
-            loadTasks(
-                currentUser.id
-            );
-
-        projects =
-            ensureDefaultProject(
-                currentUser.id
-            );
-
-        if (
-            !projects.some(
-                project =>
-                    project.id ===
-                    activeProjectId
-            )
-        ) {
-            activeProjectId =
-                projects[0]?.id || "";
-        }
-
-        renderUserDashboard();
-
-        alert(
-            "Tasks imported successfully."
-        );
-
-    } catch (error) {
-
-        alert(
-            "Invalid JSON file."
-        );
-
-    } finally {
-
-        event.target.value = "";
-    }
-}
-
-
-// ========================================
-// KEYBOARD SHORTCUTS
-// ========================================
-
-function attachKeyboardEvents() {
-
-    document.addEventListener(
-        "keydown",
-        event => {
-
-            const active =
-                document.activeElement;
-
-            const isTyping =
-                active &&
-                (
-                    active.tagName === "INPUT" ||
-                    active.tagName === "TEXTAREA" ||
-                    active.tagName === "SELECT"
-                );
-
-            // N = focus task input
-            if (
-                event.key.toLowerCase() === "n" &&
-                !isTyping &&
-                !appScreen.hidden &&
-                !userTaskManager.hidden
-            ) {
-
-                event.preventDefault();
-
-                $("taskInput")?.focus();
-
-                return;
-            }
-
-            // Escape = clear search
-            if (
-                event.key === "Escape" &&
-                !isTyping
-            ) {
-
-                if (
-                    searchText &&
-                    $("searchInput")
-                ) {
-
-                    searchText = "";
-
-                    $("searchInput").value = "";
-
-                    renderUserDashboard();
-                }
-            }
-        }
+    localStorage.setItem(
+        `tm_active_project_${currentUser.id}`,
+        activeProjectId || ""
     );
 }
 
 
-// ========================================
-// ADMIN EVENTS
-// ========================================
+/* =========================================================
+   EXPORT
+========================================================= */
 
-function attachAdminEvents() {
+function handleExport() {
+
+    if (!currentUser) return;
+
+    exportTasks(
+        currentUser.id
+    );
+}
+
+
+/* =========================================================
+   IMPORT
+========================================================= */
+
+function handleImport(event) {
+
+    const file =
+        event.target.files?.[0];
+
+    if (!file || !currentUser) return;
+
+    const reader =
+        new FileReader();
+
+    reader.onload = () => {
+
+        try {
+
+            const imported =
+                JSON.parse(
+                    reader.result
+                );
+
+            const importedTasks =
+                Array.isArray(imported)
+                    ? imported
+                    : imported.tasks;
+
+            if (
+                !Array.isArray(
+                    importedTasks
+                )
+            ) {
+                throw new Error(
+                    "Invalid file"
+                );
+            }
+
+            tasks =
+                importedTasks.map(
+                    task => ({
+                        ...task,
+                        id:
+                            task.id ||
+                            "task-" +
+                            Date.now() +
+                            Math.random(),
+
+                        projectId:
+                            task.projectId ||
+                            activeProjectId,
+
+                        assignedTo:
+                            task.assignedTo ||
+                            currentUser.id
+                    })
+                );
+
+            saveTasks(
+                currentUser.id,
+                tasks
+            );
+
+            ensureDefaultProject(
+                currentUser.id
+            );
+
+            projects =
+                loadProjects(
+                    currentUser.id
+                );
+
+            refreshTaskUI();
+
+        } catch {
+
+            alert(
+                "Unable to import this JSON file."
+            );
+        }
+
+        event.target.value = "";
+    };
+
+    reader.readAsText(file);
+}
+
+
+/* =========================================================
+   ADMIN EVENTS
+========================================================= */
+
+function bindAdminEvents() {
 
     $("adminAssignTaskForm")
         ?.addEventListener(
@@ -1828,30 +1525,19 @@ function attachAdminEvents() {
                     });
             }
         );
-
-    $("adminUserSelect")
-        ?.addEventListener(
-            "change",
-            () => {
-
-                $("adminAssignMessage")
-                    .textContent = "";
-            }
-        );
-
-    attachAdminDragAndDrop();
 }
 
 
-// ========================================
-// ADMIN DASHBOARD
-// ========================================
+/* =========================================================
+   ADMIN DASHBOARD
+========================================================= */
 
 function loadAdminDashboard() {
 
-    if (!currentUser || !isAdmin(currentUser)) {
-        return;
-    }
+    if (
+        !currentUser ||
+        !isAdmin(currentUser)
+    ) return;
 
     const users =
         loadUsers();
@@ -1862,9 +1548,7 @@ function loadAdminDashboard() {
                 user.role !== "admin"
         );
 
-    const allTasks = [];
-
-    const userStats = [];
+    let allTasks = [];
 
     regularUsers.forEach(user => {
 
@@ -1872,41 +1556,12 @@ function loadAdminDashboard() {
             loadTasks(user.id);
 
         allTasks.push(
-            ...userTasks.map(task => ({
-                ...task,
-                assignedTo: user.id,
-                assignedToName: user.name
-            }))
+            ...userTasks
         );
-
-        const total =
-            userTasks.length;
-
-        const completed =
-            userTasks.filter(
-                task =>
-                    task.status === "Done" ||
-                    task.completed === true
-            ).length;
-
-        const pending =
-            total - completed;
-
-        const progress =
-            total
-                ? Math.round(
-                    (completed / total) * 100
-                )
-                : 0;
-
-        userStats.push({
-            user,
-            total,
-            completed,
-            pending,
-            progress
-        });
     });
+
+
+    /* Summary */
 
     renderAdminSummary(
         {
@@ -1926,24 +1581,36 @@ function loadAdminDashboard() {
         allTasks
     );
 
+
+    /* Users */
+
     renderAdminUsers(
         $("adminUsersList"),
-        userStats
+        regularUsers,
+        allTasks
     );
+
+
+    /* Reports */
 
     renderAdminReports(
         $("adminReportsList"),
-        userStats
+        regularUsers,
+        allTasks
     );
+
+
+    /* User select */
 
     renderUserSelect(
         $("adminUserSelect"),
         regularUsers
     );
 
+
+    /* Admin board */
+
     renderAdminBoard(
-        allTasks,
-        regularUsers,
         {
             todo:
                 $("adminTodoColumn"),
@@ -1955,81 +1622,75 @@ function loadAdminDashboard() {
                 $("adminInReviewColumn"),
 
             done:
-                $("adminDoneColumn"),
-
-            todoCount:
-                $("adminTodoTasks"),
-
-            inProgressCount:
-                $("adminInProgressTasks"),
-
-            inReviewCount:
-                $("adminInReviewTasks"),
-
-            doneCount:
-                $("adminDoneTasks")
-        }
+                $("adminDoneColumn")
+        },
+        allTasks
     );
+
+
+    updateAdminBoardCounts(
+        allTasks
+    );
+
+    attachAdminDragAndDrop();
 }
 
 
-// ========================================
-// ADMIN ASSIGN TASK
-// ========================================
+/* =========================================================
+   ADMIN ASSIGN TASK
+========================================================= */
 
 function handleAdminAssignTask(event) {
 
     event.preventDefault();
 
+    if (
+        !currentUser ||
+        !isAdmin(currentUser)
+    ) return;
+
     const userId =
-        $("adminUserSelect").value;
+        $("adminUserSelect")?.value;
 
     const title =
-        $("adminTaskTitle")
-            .value
-            .trim();
+        $("adminTaskTitle")?.value.trim();
 
     const description =
-        $("adminTaskDescription")
-            .value
-            .trim();
+        $("adminTaskDescription")?.value.trim();
 
     const category =
-        $("adminTaskCategory").value ||
-        "Personal";
+        $("adminTaskCategory")?.value ||
+        "Work";
 
     const priority =
-        $("adminTaskPriority").value ||
+        $("adminTaskPriority")?.value ||
         "Medium";
 
     const dueDate =
-        $("adminTaskDueDate").value ||
-        "";
+        $("adminTaskDueDate")?.value || "";
 
     const projectId =
-        $("adminTaskProject").value ||
-        "";
+        $("adminTaskProject")?.value || "";
 
-    const message =
-        $("adminAssignMessage");
-
-    message.textContent = "";
 
     if (!userId) {
 
-        message.textContent =
-            "Please select a user.";
+        showAdminMessage(
+            "Please select a user."
+        );
 
         return;
     }
 
     if (!title) {
 
-        message.textContent =
-            "Please enter task title.";
+        showAdminMessage(
+            "Please enter task title."
+        );
 
         return;
     }
+
 
     const task =
         createAssignedTask(
@@ -2041,154 +1702,273 @@ function handleAdminAssignTask(event) {
                 priority,
                 dueDate,
                 projectId,
-                status: "To Do"
-            },
-            currentUser.id
+                assignedTo: userId,
+                createdBy:
+                    currentUser.id
+            }
         );
 
-    if (!task) {
 
-        message.textContent =
-            "Task could not be assigned.";
+    const userTasks =
+        loadTasks(userId);
 
-        return;
-    }
+    userTasks.push(task);
 
-    message.textContent =
-        "Task assigned successfully.";
+    saveTasks(
+        userId,
+        userTasks
+    );
 
-    $("adminTaskTitle").value = "";
-    $("adminTaskDescription").value = "";
-    $("adminTaskDueDate").value = "";
+
+    showAdminMessage(
+        "Task assigned successfully."
+    );
+
+
+    $("adminAssignTaskForm")
+        ?.reset();
 
     loadAdminDashboard();
 }
 
 
-// ========================================
-// ADMIN DRAG AND DROP
-// ========================================
+function showAdminMessage(message) {
+
+    const element =
+        $("adminAssignMessage");
+
+    if (!element) return;
+
+    element.textContent =
+        message;
+
+    setTimeout(
+        () => {
+
+            element.textContent = "";
+
+        },
+        3000
+    );
+}
+
+
+/* =========================================================
+   ADMIN BOARD COUNTS
+========================================================= */
+
+function updateAdminBoardCounts(allTasks) {
+
+    const counts = {
+        todo: 0,
+        inProgress: 0,
+        inReview: 0,
+        done: 0
+    };
+
+    allTasks.forEach(task => {
+
+        if (task.status === "todo") {
+            counts.todo++;
+        }
+
+        if (
+            task.status ===
+            "in-progress"
+        ) {
+            counts.inProgress++;
+        }
+
+        if (
+            task.status ===
+            "in-review"
+        ) {
+            counts.inReview++;
+        }
+
+        if (task.status === "done") {
+            counts.done++;
+        }
+    });
+
+
+    if ($("adminTodoTasks"))
+        $("adminTodoTasks").textContent =
+            counts.todo;
+
+    if ($("adminInProgressTasks"))
+        $("adminInProgressTasks").textContent =
+            counts.inProgress;
+
+    if ($("adminInReviewTasks"))
+        $("adminInReviewTasks").textContent =
+            counts.inReview;
+
+    if ($("adminDoneTasks"))
+        $("adminDoneTasks").textContent =
+            counts.done;
+}
+
+
+/* =========================================================
+   ADMIN DRAG & DROP
+========================================================= */
 
 function attachAdminDragAndDrop() {
 
-    document.addEventListener(
-        "dragover",
-        event => {
-
-            const column =
-                event.target.closest(
-                    ".admin-board-column"
-                );
-
-            if (!column) return;
-
-            event.preventDefault();
-        }
-    );
-
-    document.addEventListener(
-        "drop",
-        event => {
-
-            const column =
-                event.target.closest(
-                    ".admin-board-column"
-                );
-
-            if (!column) return;
-
-            event.preventDefault();
-
-            const taskId =
-                event.dataTransfer.getData(
-                    "text/plain"
-                );
-
-            if (!taskId) return;
-
-            const newStatus =
-                getStatusFromColumn(
-                    column
-                );
-
-            if (!newStatus) return;
-
-            updateAdminTaskStatus(
-                taskId,
-                newStatus
-            );
-        }
-    );
-}
-
-
-// ========================================
-// UPDATE ADMIN TASK STATUS
-// ========================================
-
-function updateAdminTaskStatus(
-    taskId,
-    newStatus
-) {
-
-    const users =
-        loadUsers();
-
-    for (const user of users) {
-
-        if (user.role === "admin") {
-            continue;
-        }
-
-        const userTasks =
-            loadTasks(user.id);
-
-        const task =
-            userTasks.find(
-                item =>
-                    item.id === taskId
-            );
-
-        if (!task) continue;
-
-        task.status =
-            newStatus;
-
-        task.completed =
-            newStatus === "Done";
-
-        task.updatedAt =
-            new Date().toISOString();
-
-        saveTasks(
-            user.id,
-            userTasks
+    const cards =
+        document.querySelectorAll(
+            ".admin-task-card"
         );
 
-        break;
-    }
+    cards.forEach(card => {
 
-    loadAdminDashboard();
+        card.draggable = true;
+
+        card.addEventListener(
+            "dragstart",
+            () => {
+
+                card.classList.add(
+                    "dragging"
+                );
+            }
+        );
+
+        card.addEventListener(
+            "dragend",
+            () => {
+
+                card.classList.remove(
+                    "dragging"
+                );
+            }
+        );
+    });
+
+
+    const columns =
+        document.querySelectorAll(
+            ".admin-board-column"
+        );
+
+    columns.forEach(column => {
+
+        column.addEventListener(
+            "dragover",
+            event => {
+
+                event.preventDefault();
+            }
+        );
+
+        column.addEventListener(
+            "drop",
+            event => {
+
+                event.preventDefault();
+
+                const card =
+                    document.querySelector(
+                        ".admin-task-card.dragging"
+                    );
+
+                if (!card) return;
+
+                const taskId =
+                    card.dataset.taskId;
+
+                const newStatus =
+                    column.dataset.status;
+
+                if (!taskId || !newStatus)
+                    return;
+
+
+                const users =
+                    loadUsers();
+
+                users
+                    .filter(
+                        user =>
+                            user.role !== "admin"
+                    )
+                    .forEach(user => {
+
+                        const userTasks =
+                            loadTasks(
+                                user.id
+                            );
+
+                        const task =
+                            userTasks.find(
+                                item =>
+                                    item.id ===
+                                    taskId
+                            );
+
+                        if (task) {
+
+                            task.status =
+                                newStatus;
+
+                            task.updatedAt =
+                                new Date()
+                                    .toISOString();
+
+                            saveTasks(
+                                user.id,
+                                userTasks
+                            );
+                        }
+                    });
+
+
+                loadAdminDashboard();
+            }
+        );
+    });
 }
 
 
-// ========================================
-// CREATE ID
-// ========================================
+/* =========================================================
+   KEYBOARD SHORTCUTS
+========================================================= */
 
-function createId() {
+function handleKeyboardShortcuts(event) {
+
+    const tag =
+        event.target?.tagName;
+
+    const isTyping =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT";
+
 
     if (
-        typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
+        event.key.toLowerCase() === "n" &&
+        !isTyping
     ) {
-        return crypto.randomUUID();
+
+        event.preventDefault();
+
+        $("taskInput")?.focus();
     }
 
-    return (
-        Date.now().toString(36) +
-        Math.random()
-            .toString(36)
-            .slice(2)
-    );
+
+    if (
+        event.key === "Escape" &&
+        !isTyping
+    ) {
+
+        if ($("searchInput")) {
+
+            $("searchInput").value = "";
+
+            currentSearch = "";
+
+            refreshTaskUI();
+        }
+    }
 }
