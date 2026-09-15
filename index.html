@@ -3,151 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Task Manager</title>
-
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <!-- =====================================================
+    <!-- =========================
          AUTH SCREEN
-    ====================================================== -->
+    ========================== -->
+    <section id="authScreen" class="auth-screen">
 
-    <main id="authScreen" class="auth-screen">
+        <div class="auth-card">
 
-        <!-- LOGIN -->
-        <section id="loginSection" class="auth-card">
-
-            <div class="auth-header">
-                <h1>Task Manager</h1>
-                <p>Manage your tasks and projects easily.</p>
+            <div class="auth-logo">
+                <span>✓</span>
             </div>
 
-            <form id="loginForm">
+            <h1>Task Manager</h1>
+            <p class="auth-subtitle">
+                Manage your tasks and projects easily.
+            </p>
 
-                <div class="form-group">
-                    <label for="loginEmail">Email</label>
-                    <input
-                        type="email"
-                        id="loginEmail"
-                        placeholder="Enter your email"
-                        required
-                    >
+            <!-- LOGIN -->
+            <div id="loginSection">
+
+                <form id="loginForm">
+
+                    <div class="form-group">
+                        <label for="loginEmail">Email</label>
+                        <input
+                            type="email"
+                            id="loginEmail"
+                            placeholder="Enter your email"
+                            required
+                            autocomplete="email"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input
+                            type="password"
+                            id="loginPassword"
+                            placeholder="Enter your password"
+                            required
+                            autocomplete="current-password"
+                        >
+                    </div>
+
+                    <p id="loginError" class="form-error"></p>
+
+                    <button type="submit" class="primary-btn full-width">
+                        Login
+                    </button>
+
+                </form>
+
+                <p class="auth-switch">
+                    Don't have an account?
+                    <button type="button" id="showRegisterBtn" class="link-btn">
+                        Register
+                    </button>
+                </p>
+
+                <div class="admin-login-hint">
+                    <strong>Master Admin</strong>
+                    <span>admin@taskmanager.com</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="loginPassword">Password</label>
-                    <input
-                        type="password"
-                        id="loginPassword"
-                        placeholder="Enter your password"
-                        required
-                    >
-                </div>
-
-                <p id="loginError" class="error-message"></p>
-
-                <button type="submit" class="primary-btn">
-                    Login
-                </button>
-
-            </form>
-
-            <div class="auth-switch">
-                <span>Don't have an account?</span>
-                <button type="button" id="showRegisterBtn" class="text-btn">
-                    Register
-                </button>
             </div>
 
-        </section>
 
+            <!-- REGISTER -->
+            <div id="registerSection" class="hidden">
 
-        <!-- REGISTER -->
-        <section id="registerSection" class="auth-card" hidden>
+                <form id="registerForm">
 
-            <div class="auth-header">
-                <h1>Create Account</h1>
-                <p>Create your Task Manager account.</p>
+                    <div class="form-group">
+                        <label for="registerName">Full Name</label>
+                        <input
+                            type="text"
+                            id="registerName"
+                            placeholder="Enter your name"
+                            required
+                            autocomplete="name"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerEmail">Email</label>
+                        <input
+                            type="email"
+                            id="registerEmail"
+                            placeholder="Enter your email"
+                            required
+                            autocomplete="email"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerPassword">Password</label>
+                        <input
+                            type="password"
+                            id="registerPassword"
+                            placeholder="Create a password"
+                            required
+                            minlength="4"
+                            autocomplete="new-password"
+                        >
+                    </div>
+
+                    <p id="registerError" class="form-error"></p>
+
+                    <button type="submit" class="primary-btn full-width">
+                        Create Account
+                    </button>
+
+                </form>
+
+                <p class="auth-switch">
+                    Already have an account?
+                    <button type="button" id="showLoginBtn" class="link-btn">
+                        Login
+                    </button>
+                </p>
+
             </div>
 
-            <form id="registerForm">
+        </div>
 
-                <div class="form-group">
-                    <label for="registerName">Name</label>
-                    <input
-                        type="text"
-                        id="registerName"
-                        placeholder="Enter your name"
-                        required
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="registerEmail">Email</label>
-                    <input
-                        type="email"
-                        id="registerEmail"
-                        placeholder="Enter your email"
-                        required
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="registerPassword">Password</label>
-                    <input
-                        type="password"
-                        id="registerPassword"
-                        placeholder="Create a password"
-                        required
-                    >
-                </div>
-
-                <p id="registerError" class="error-message"></p>
-
-                <button type="submit" class="primary-btn">
-                    Create Account
-                </button>
-
-            </form>
-
-            <div class="auth-switch">
-                <span>Already have an account?</span>
-                <button type="button" id="showLoginBtn" class="text-btn">
-                    Login
-                </button>
-            </div>
-
-        </section>
-
-    </main>
+    </section>
 
 
-    <!-- =====================================================
-         MAIN APPLICATION
-    ====================================================== -->
-
-    <div id="appScreen" hidden>
+    <!-- =========================
+         MAIN APP
+    ========================== -->
+    <section id="appScreen" class="app-screen hidden">
 
         <!-- HEADER -->
-        <header class="app-header">
+        <header class="top-header">
 
             <div class="header-left">
-                <h1>Task Manager</h1>
-                <p id="welcomeMessage">Welcome</p>
+                <div class="brand-mark">✓</div>
+
+                <div>
+                    <h1>Task Manager</h1>
+                    <p id="welcomeMessage">Welcome</p>
+                </div>
             </div>
 
             <div class="header-right">
 
-                <span id="currentUserRole" class="role-badge"></span>
+                <span id="currentUserRole" class="role-badge">
+                    User
+                </span>
 
-                <button
-                    type="button"
-                    id="logoutBtn"
-                    class="secondary-btn"
-                >
+                <button id="logoutBtn" class="secondary-btn">
                     Logout
                 </button>
 
@@ -156,147 +168,188 @@
         </header>
 
 
-        <!-- =================================================
+        <!-- =========================
              ADMIN DASHBOARD
-        ================================================== -->
-
-        <section id="adminDashboard" hidden class="admin-dashboard">
+        ========================== -->
+        <main id="adminDashboard" class="dashboard hidden">
 
             <div class="page-heading">
-                <h2>Master Admin Dashboard</h2>
-                <p>Manage users, tasks and progress.</p>
+
+                <div>
+                    <span class="eyebrow">MASTER CONTROL</span>
+                    <h2>Admin Dashboard</h2>
+                    <p>
+                        Manage users, assign tasks and monitor progress.
+                    </p>
+                </div>
+
             </div>
 
 
             <!-- ADMIN SUMMARY -->
-
-            <section class="summary-grid">
+            <section class="admin-summary-grid">
 
                 <article class="summary-card">
-                    <span>Total Users</span>
+                    <span class="summary-label">Total Users</span>
                     <strong id="adminTotalUsers">0</strong>
                 </article>
 
                 <article class="summary-card">
-                    <span>Total Tasks</span>
+                    <span class="summary-label">Total Tasks</span>
                     <strong id="adminTotalTasks">0</strong>
                 </article>
 
                 <article class="summary-card">
-                    <span>Pending Tasks</span>
+                    <span class="summary-label">Pending Tasks</span>
                     <strong id="adminPendingTasks">0</strong>
                 </article>
 
                 <article class="summary-card">
-                    <span>Completed Tasks</span>
+                    <span class="summary-label">Completed Tasks</span>
                     <strong id="adminCompletedTasks">0</strong>
                 </article>
 
             </section>
 
 
-            <!-- USERS -->
-
+            <!-- =========================
+                 USERS
+            ========================== -->
             <section class="admin-section">
 
                 <div class="section-heading">
                     <div>
+                        <span class="eyebrow">TEAM</span>
                         <h3>Users</h3>
-                        <p>Registered users and their progress.</p>
                     </div>
                 </div>
 
                 <div id="adminUsersList" class="admin-users-list">
-                    <!-- Users rendered by render.js -->
+                    <!-- Users rendered by JavaScript -->
                 </div>
 
             </section>
 
 
-            <!-- ASSIGN TASK -->
-
+            <!-- =========================
+                 ASSIGN TASK
+            ========================== -->
             <section class="admin-section">
 
                 <div class="section-heading">
+
                     <div>
-                        <h3>Assign New Task</h3>
-                        <p>Assign a task to a specific user.</p>
+                        <span class="eyebrow">TASK MANAGEMENT</span>
+                        <h3>Assign Task</h3>
+                        <p>
+                            Create a task and assign it to a specific user.
+                        </p>
                     </div>
+
                 </div>
+
 
                 <form id="adminAssignTaskForm" class="admin-task-form">
 
-                    <div class="form-group">
-                        <label for="adminUserSelect">
-                            Assign To
-                        </label>
+                    <div class="form-row">
 
-                        <select id="adminUserSelect" required>
-                            <option value="">
-                                Select User
-                            </option>
-                        </select>
+                        <div class="form-group">
+                            <label for="adminUserSelect">
+                                Assign To
+                            </label>
+
+                            <select id="adminUserSelect" required>
+                                <option value="">
+                                    Select a user
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="adminTaskTitle">
+                                Task Title
+                            </label>
+
+                            <input
+                                type="text"
+                                id="adminTaskTitle"
+                                placeholder="Enter task title"
+                                required
+                            >
+                        </div>
+
                     </div>
 
 
                     <div class="form-group">
-                        <label for="adminTaskTitle">
-                            Task Title
-                        </label>
 
-                        <input
-                            type="text"
-                            id="adminTaskTitle"
-                            placeholder="Enter task title"
-                            required
-                        >
-                    </div>
-
-
-                    <div class="form-group">
                         <label for="adminTaskDescription">
                             Description
                         </label>
 
                         <textarea
                             id="adminTaskDescription"
-                            placeholder="Enter task description"
                             rows="4"
+                            placeholder="Enter task description"
                         ></textarea>
+
                     </div>
 
 
                     <div class="form-row">
 
                         <div class="form-group">
+
                             <label for="adminTaskCategory">
                                 Category
                             </label>
 
                             <select id="adminTaskCategory">
-                                <option value="Work">Work</option>
-                                <option value="Personal">Personal</option>
-                                <option value="Urgent">Urgent</option>
+
+                                <option value="Work">
+                                    Work
+                                </option>
+
+                                <option value="Personal">
+                                    Personal
+                                </option>
+
+                                <option value="Urgent">
+                                    Urgent
+                                </option>
+
                             </select>
+
                         </div>
 
 
                         <div class="form-group">
+
                             <label for="adminTaskPriority">
                                 Priority
                             </label>
 
                             <select id="adminTaskPriority">
-                                <option value="Low">Low</option>
-                                <option value="Normal" selected>
-                                    Normal
+
+                                <option value="Low">
+                                    Low
                                 </option>
-                                <option value="High">High</option>
+
+                                <option value="Medium" selected>
+                                    Medium
+                                </option>
+
+                                <option value="High">
+                                    High
+                                </option>
+
                             </select>
+
                         </div>
 
 
                         <div class="form-group">
+
                             <label for="adminTaskDueDate">
                                 Due Date
                             </label>
@@ -305,101 +358,148 @@
                                 type="date"
                                 id="adminTaskDueDate"
                             >
+
                         </div>
 
                     </div>
 
 
                     <div class="form-group">
+
                         <label for="adminTaskProject">
                             Project
                         </label>
 
                         <select id="adminTaskProject">
+
                             <option value="">
                                 No Project
                             </option>
+
                         </select>
+
                     </div>
 
 
-                    <button
-                        type="submit"
-                        class="primary-btn"
-                    >
-                        Assign Task
-                    </button>
+                    <div class="admin-form-actions">
 
-                    <p id="adminAssignMessage" class="success-message"></p>
+                        <button
+                            type="submit"
+                            class="primary-btn"
+                        >
+                            Assign Task
+                        </button>
+
+                        <p
+                            id="adminAssignMessage"
+                            class="success-message"
+                        ></p>
+
+                    </div>
 
                 </form>
 
             </section>
 
 
-            <!-- ADMIN KANBAN -->
-
+            <!-- =========================
+                 ADMIN KANBAN
+            ========================== -->
             <section class="admin-section">
 
                 <div class="section-heading">
+
                     <div>
-                        <h3>All User Tasks</h3>
-                        <p>View task progress by status.</p>
+                        <span class="eyebrow">OVERVIEW</span>
+                        <h3>Task Board</h3>
                     </div>
+
                 </div>
 
 
-                <div class="board-grid admin-board">
+                <div class="kanban-board admin-kanban">
 
-                    <div class="board-column">
-                        <div class="board-column-header">
+                    <!-- TO DO -->
+                    <div class="kanban-column">
+
+                        <div class="kanban-column-header">
+
                             <h4>To Do</h4>
-                            <span id="adminTodoTasks">0</span>
+
+                            <span id="adminTodoTasks">
+                                0
+                            </span>
+
                         </div>
 
                         <div
                             id="adminTodoColumn"
-                            class="board-task-list"
+                            class="kanban-task-list"
                         ></div>
+
                     </div>
 
 
-                    <div class="board-column">
-                        <div class="board-column-header">
+                    <!-- IN PROGRESS -->
+                    <div class="kanban-column">
+
+                        <div class="kanban-column-header">
+
                             <h4>In Progress</h4>
-                            <span id="adminInProgressTasks">0</span>
+
+                            <span id="adminInProgressTasks">
+                                0
+                            </span>
+
                         </div>
 
                         <div
                             id="adminInProgressColumn"
-                            class="board-task-list"
+                            class="kanban-task-list"
                         ></div>
+
                     </div>
 
 
-                    <div class="board-column">
-                        <div class="board-column-header">
+                    <!-- IN REVIEW -->
+                    <div class="kanban-column">
+
+                        <div class="kanban-column-header">
+
                             <h4>In Review</h4>
-                            <span id="adminInReviewTasks">0</span>
+
+                            <span id="adminInReviewTasks">
+                                0
+                            </span>
+
                         </div>
 
                         <div
                             id="adminInReviewColumn"
-                            class="board-task-list"
+                            class="kanban-task-list"
                         ></div>
+
                     </div>
 
 
-                    <div class="board-column">
-                        <div class="board-column-header">
+                    <!-- DONE -->
+                    <div class="kanban-column">
+
+                        <div class="kanban-column-header">
+
                             <h4>Done</h4>
-                            <span id="adminDoneTasks">0</span>
+
+                            <span id="adminDoneTasks">
+                                0
+                            </span>
+
                         </div>
 
                         <div
                             id="adminDoneColumn"
-                            class="board-task-list"
+                            class="kanban-task-list"
                         ></div>
+
                     </div>
 
                 </div>
@@ -407,19 +507,22 @@
             </section>
 
 
-            <!-- REPORTS -->
-
+            <!-- =========================
+                 REPORTS
+            ========================== -->
             <section class="admin-section">
 
                 <div class="section-heading">
 
                     <div>
-                        <h3>User Reports</h3>
-                        <p>Individual task completion progress.</p>
+                        <span class="eyebrow">ANALYTICS</span>
+                        <h3>User-wise Reports</h3>
+                        <p>
+                            Track each user's task completion progress.
+                        </p>
                     </div>
 
                     <button
-                        type="button"
                         id="refreshAdminReportsBtn"
                         class="secondary-btn"
                     >
@@ -429,103 +532,134 @@
                 </div>
 
 
-                <div id="adminReportsList" class="reports-list">
-                    <!-- Reports rendered by render.js -->
+                <div
+                    id="adminReportsList"
+                    class="admin-reports-list"
+                >
+                    <!-- Reports rendered by JavaScript -->
                 </div>
 
             </section>
 
 
-            <div class="admin-actions">
+            <div class="admin-footer-action">
 
                 <button
-                    type="button"
                     id="adminOpenTaskManagerBtn"
-                    class="primary-btn"
+                    class="secondary-btn"
                 >
-                    Open My Task Manager
+                    Open Task Manager
                 </button>
 
             </div>
 
-        </section>
+        </main>
 
 
-        <!-- =================================================
+        <!-- =========================
              USER TASK MANAGER
-        ================================================== -->
+        ========================== -->
+        <main id="userTaskManager" class="dashboard hidden">
 
-        <main id="userTaskManager" class="task-manager" hidden>
+            <!-- PROJECT HEADER -->
+            <section class="project-header">
 
-            <!-- PROJECT AREA -->
+                <div>
 
-            <section class="project-section">
+                    <span class="eyebrow">
+                        CURRENT PROJECT
+                    </span>
 
-                <div class="project-top">
-
-                    <div>
-
-                        <p class="small-label">
-                            Current Project
-                        </p>
-
-                        <h2 id="activeProjectName">
-                            No Project
-                        </h2>
-
-                    </div>
-
-                    <div id="projectSwitcher">
-                        <!-- Projects rendered here -->
-                    </div>
+                    <h2 id="activeProjectName">
+                        My Tasks
+                    </h2>
 
                 </div>
 
 
-                <div class="project-progress">
+                <div class="project-actions">
 
-                    <div class="progress-info">
-
-                        <span>
-                            Project Progress
-                        </span>
-
-                        <strong id="progressText">
-                            0%
-                        </strong>
-
+                    <div
+                        id="projectSwitcher"
+                        class="project-switcher"
+                    >
+                        <!-- Projects rendered by JavaScript -->
                     </div>
 
-                    <div class="progress-bar">
-                        <div
-                            id="progressFill"
-                            class="progress-fill"
-                            style="width: 0%;"
-                        ></div>
-                    </div>
+                    <button
+                        id="newProjectBtn"
+                        class="primary-btn"
+                    >
+                        + New Project
+                    </button>
 
                 </div>
 
             </section>
 
 
-            <!-- ADD TASK -->
+            <!-- PROJECT PROGRESS -->
+            <section class="progress-section">
 
+                <div class="progress-header">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            PROJECT PROGRESS
+                        </span>
+
+                        <strong id="progressText">
+                            0 of 0 tasks done
+                        </strong>
+
+                    </div>
+
+                    <span id="progressPercentage">
+                        0%
+                    </span>
+
+                </div>
+
+                <div class="progress-bar">
+
+                    <div
+                        id="progressFill"
+                        class="progress-fill"
+                    ></div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =========================
+                 ADD TASK
+            ========================== -->
             <section class="task-create-section">
 
                 <div class="section-heading">
 
                     <div>
-                        <h2>Add Task</h2>
-                        <p>Create a new task for your project.</p>
+
+                        <span class="eyebrow">
+                            ADD TASK
+                        </span>
+
+                        <h3>Create a new task</h3>
+
+                        <p>
+                            Add a task for your current project.
+                        </p>
+
                     </div>
 
                 </div>
 
 
-                <div class="task-create-form">
+                <div class="add-task-form">
 
-                    <div class="form-group task-title-field">
+                    <div class="form-group task-title-group">
 
                         <label for="taskInput">
                             Task
@@ -595,9 +729,9 @@
 
 
                     <button
-                        type="button"
                         id="addTaskBtn"
                         class="primary-btn"
+                        type="button"
                     >
                         Add Task
                     </button>
@@ -607,9 +741,10 @@
             </section>
 
 
-            <!-- CONTROLS -->
-
-            <section class="controls-section">
+            <!-- =========================
+                 SEARCH + FILTER
+            ========================== -->
+            <section class="task-controls">
 
                 <div class="search-box">
 
@@ -694,19 +829,19 @@
                 </div>
 
 
-                <div class="view-switch">
+                <div class="view-switcher">
 
                     <button
-                        type="button"
                         id="listViewBtn"
+                        type="button"
                         class="view-btn active"
                     >
                         List
                     </button>
 
                     <button
-                        type="button"
                         id="boardViewBtn"
+                        type="button"
                         class="view-btn"
                     >
                         Kanban
@@ -717,155 +852,167 @@
             </section>
 
 
-            <!-- TASK LIST -->
+            <!-- =========================
+                 LIST VIEW
+            ========================== -->
+            <section id="taskListView" class="task-list-view">
 
-            <section
-                id="taskList"
-                class="task-list"
-            >
-                <!-- Tasks rendered by render.js -->
-            </section>
-
-
-            <!-- EMPTY STATE -->
-
-            <section
-                id="emptyState"
-                class="empty-state"
-                hidden
-            >
-
-                <h3>No tasks found</h3>
-
-                <p>
-                    Add a new task or change your search/filter.
-                </p>
-
-            </section>
+                <div
+                    id="taskList"
+                    class="task-list"
+                >
+                    <!-- Tasks rendered by JavaScript -->
+                </div>
 
 
-            <!-- =================================================
-                 KANBAN BOARD
-            ================================================== -->
+                <div
+                    id="emptyState"
+                    class="empty-state"
+                >
 
-            <section
-                id="kanbanBoard"
-                class="board-section"
-                hidden
-            >
-
-                <div class="board-grid">
-
-
-                    <!-- TO DO -->
-
-                    <div class="board-column">
-
-                        <div class="board-column-header">
-
-                            <div>
-                                <h3>To Do</h3>
-                            </div>
-
-                            <span id="todoCount">0</span>
-
-                        </div>
-
-                        <div
-                            id="todoColumn"
-                            class="board-task-list"
-                        ></div>
-
+                    <div class="empty-icon">
+                        ✓
                     </div>
 
+                    <h3>No tasks found</h3>
 
-                    <!-- IN PROGRESS -->
-
-                    <div class="board-column">
-
-                        <div class="board-column-header">
-
-                            <div>
-                                <h3>In Progress</h3>
-                            </div>
-
-                            <span id="inProgressCount">0</span>
-
-                        </div>
-
-                        <div
-                            id="inProgressColumn"
-                            class="board-task-list"
-                        ></div>
-
-                    </div>
-
-
-                    <!-- IN REVIEW -->
-
-                    <div class="board-column">
-
-                        <div class="board-column-header">
-
-                            <div>
-                                <h3>In Review</h3>
-                            </div>
-
-                            <span id="inReviewCount">0</span>
-
-                        </div>
-
-                        <div
-                            id="inReviewColumn"
-                            class="board-task-list"
-                        ></div>
-
-                    </div>
-
-
-                    <!-- DONE -->
-
-                    <div class="board-column">
-
-                        <div class="board-column-header">
-
-                            <div>
-                                <h3>Done</h3>
-                            </div>
-
-                            <span id="doneCount">0</span>
-
-                        </div>
-
-                        <div
-                            id="doneColumn"
-                            class="board-task-list"
-                        ></div>
-
-                    </div>
+                    <p>
+                        Add a new task or change your search/filter.
+                    </p>
 
                 </div>
 
             </section>
 
 
-            <!-- DATA ACTIONS -->
+            <!-- =========================
+                 KANBAN VIEW
+            ========================== -->
+            <section
+                id="kanbanBoard"
+                class="kanban-board hidden"
+            >
 
+                <!-- TO DO -->
+                <div
+                    class="kanban-column"
+                    data-status="To Do"
+                >
+
+                    <div class="kanban-column-header">
+
+                        <div>
+                            <span class="status-dot todo-dot"></span>
+                            <h4>To Do</h4>
+                        </div>
+
+                        <span id="todoCount">0</span>
+
+                    </div>
+
+                    <div
+                        id="todoColumn"
+                        class="kanban-task-list"
+                    ></div>
+
+                </div>
+
+
+                <!-- IN PROGRESS -->
+                <div
+                    class="kanban-column"
+                    data-status="In Progress"
+                >
+
+                    <div class="kanban-column-header">
+
+                        <div>
+                            <span class="status-dot progress-dot"></span>
+                            <h4>In Progress</h4>
+                        </div>
+
+                        <span id="inProgressCount">0</span>
+
+                    </div>
+
+                    <div
+                        id="inProgressColumn"
+                        class="kanban-task-list"
+                    ></div>
+
+                </div>
+
+
+                <!-- IN REVIEW -->
+                <div
+                    class="kanban-column"
+                    data-status="In Review"
+                >
+
+                    <div class="kanban-column-header">
+
+                        <div>
+                            <span class="status-dot review-dot"></span>
+                            <h4>In Review</h4>
+                        </div>
+
+                        <span id="inReviewCount">0</span>
+
+                    </div>
+
+                    <div
+                        id="inReviewColumn"
+                        class="kanban-task-list"
+                    ></div>
+
+                </div>
+
+
+                <!-- DONE -->
+                <div
+                    class="kanban-column"
+                    data-status="Done"
+                >
+
+                    <div class="kanban-column-header">
+
+                        <div>
+                            <span class="status-dot done-dot"></span>
+                            <h4>Done</h4>
+                        </div>
+
+                        <span id="doneCount">0</span>
+
+                    </div>
+
+                    <div
+                        id="doneColumn"
+                        class="kanban-task-list"
+                    ></div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =========================
+                 IMPORT / EXPORT
+            ========================== -->
             <section class="data-actions">
 
                 <button
-                    type="button"
                     id="exportBtn"
+                    type="button"
                     class="secondary-btn"
                 >
-                    Export JSON
+                    Export Tasks
                 </button>
 
                 <label
                     for="importFileInput"
-                    class="secondary-btn file-label"
+                    class="secondary-btn file-btn"
                 >
-                    Import JSON
+                    Import Tasks
                 </label>
 
                 <input
@@ -879,196 +1026,202 @@
 
         </main>
 
-    </div>
+    </section>
 
 
-    <!-- =====================================================
-         TASK DETAIL MODAL
-    ====================================================== -->
+    <!-- =========================
+         TASK DETAIL DIALOG
+    ========================== -->
+    <dialog id="taskDetailDialog" class="modal-dialog">
 
-    <dialog id="taskDetailDialog" class="task-dialog">
+        <div class="dialog-header">
 
-        <div class="dialog-content">
+            <div>
+                <span class="eyebrow">
+                    TASK DETAILS
+                </span>
 
-            <div class="dialog-header">
+                <h2>Task</h2>
+            </div>
 
-                <h2>Task Details</h2>
+            <button
+                id="closeTaskDetailBtn"
+                type="button"
+                class="icon-btn"
+                aria-label="Close"
+            >
+                ×
+            </button>
 
-                <button
-                    type="button"
-                    id="closeTaskDetailBtn"
-                    class="close-btn"
+        </div>
+
+
+        <div class="dialog-body">
+
+            <div class="form-group">
+
+                <label for="detailTaskTitle">
+                    Task Title
+                </label>
+
+                <input
+                    type="text"
+                    id="detailTaskTitle"
                 >
-                    ×
-                </button>
 
             </div>
 
 
-            <div class="task-detail-body">
+            <div class="form-group">
 
-                <div class="form-group">
+                <label for="detailDescription">
+                    Description
+                </label>
 
-                    <label for="detailTaskTitle">
-                        Task Title
-                    </label>
+                <textarea
+                    id="detailDescription"
+                    rows="4"
+                ></textarea>
 
-                    <input
-                        type="text"
-                        id="detailTaskTitle"
-                    >
+            </div>
 
+
+            <div class="task-detail-meta">
+
+                <div>
+                    <span>Status</span>
+                    <strong id="detailStatus">To Do</strong>
                 </div>
 
-
-                <div class="form-group">
-
-                    <label for="detailDescription">
-                        Description
-                    </label>
-
-                    <textarea
-                        id="detailDescription"
-                        rows="4"
-                    ></textarea>
-
+                <div>
+                    <span>Priority</span>
+                    <strong id="detailPriority">Medium</strong>
                 </div>
 
-
-                <div class="detail-grid">
-
-                    <div class="detail-item">
-                        <span>Status</span>
-                        <strong id="detailStatus">To Do</strong>
-                    </div>
-
-                    <div class="detail-item">
-                        <span>Priority</span>
-                        <strong id="detailPriority">Normal</strong>
-                    </div>
-
-                    <div class="detail-item">
-                        <span>Due Date</span>
-                        <strong id="detailDueDate">-</strong>
-                    </div>
-
-                    <div class="detail-item">
-                        <span>Category</span>
-                        <strong id="detailCategory">Work</strong>
-                    </div>
-
+                <div>
+                    <span>Due Date</span>
+                    <strong id="detailDueDate">—</strong>
                 </div>
 
-
-                <!-- NOTES -->
-
-                <div class="form-group">
-
-                    <label for="taskNotes">
-                        Notes
-                    </label>
-
-                    <textarea
-                        id="taskNotes"
-                        rows="5"
-                        placeholder="Add notes for this task..."
-                    ></textarea>
-
+                <div>
+                    <span>Category</span>
+                    <strong id="detailCategory">Work</strong>
                 </div>
+
+            </div>
+
+
+            <!-- NOTES -->
+            <div class="form-group">
+
+                <label for="taskNotes">
+                    Notes
+                </label>
+
+                <textarea
+                    id="taskNotes"
+                    rows="5"
+                    placeholder="Add notes..."
+                ></textarea>
 
                 <button
-                    type="button"
                     id="saveNotesBtn"
-                    class="primary-btn"
+                    type="button"
+                    class="secondary-btn"
                 >
                     Save Notes
                 </button>
 
+            </div>
 
-                <!-- SUBTASKS -->
 
-                <div class="subtasks-section">
+            <!-- SUBTASKS -->
+            <div class="subtask-section">
 
-                    <div class="section-heading">
+                <div class="section-heading">
 
-                        <div>
-                            <h3>Subtasks</h3>
-                        </div>
-
+                    <div>
+                        <h3>Subtasks</h3>
                     </div>
-
-
-                    <div class="subtask-create">
-
-                        <input
-                            type="text"
-                            id="subtaskInput"
-                            placeholder="Add a subtask..."
-                        >
-
-                        <button
-                            type="button"
-                            id="addSubtaskBtn"
-                            class="secondary-btn"
-                        >
-                            Add
-                        </button>
-
-                    </div>
-
-
-                    <div
-                        id="subtaskList"
-                        class="subtask-list"
-                    ></div>
 
                 </div>
 
+
+                <div class="subtask-add">
+
+                    <input
+                        type="text"
+                        id="subtaskInput"
+                        placeholder="Add a subtask..."
+                    >
+
+                    <button
+                        id="addSubtaskBtn"
+                        type="button"
+                        class="primary-btn"
+                    >
+                        Add
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="subtaskList"
+                    class="subtask-list"
+                ></div>
+
             </div>
 
+        </div>
 
-            <div class="dialog-footer">
 
-                <button
-                    type="button"
-                    id="closeTaskDetailBtnBottom"
-                    class="secondary-btn"
-                >
-                    Close
-                </button>
+        <div class="dialog-footer">
 
-            </div>
+            <button
+                id="closeTaskDetailBtnBottom"
+                type="button"
+                class="secondary-btn"
+            >
+                Close
+            </button>
 
         </div>
 
     </dialog>
 
 
-    <!-- =====================================================
-         NEW PROJECT MODAL
-    ====================================================== -->
-
+    <!-- =========================
+         NEW PROJECT DIALOG
+    ========================== -->
     <dialog
         id="newProjectDialog"
-        class="task-dialog"
+        class="modal-dialog small-dialog"
     >
 
-        <div class="dialog-content">
+        <div class="dialog-header">
 
-            <div class="dialog-header">
+            <div>
+                <span class="eyebrow">
+                    PROJECT
+                </span>
 
-                <h2>Create New Project</h2>
-
-                <button
-                    type="button"
-                    id="closeNewProjectBtn"
-                    class="close-btn"
-                >
-                    ×
-                </button>
-
+                <h2>New Project</h2>
             </div>
 
+            <button
+                id="closeNewProjectBtn"
+                type="button"
+                class="icon-btn"
+                aria-label="Close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div class="dialog-body">
 
             <div class="form-group">
 
@@ -1082,45 +1235,45 @@
                     placeholder="Enter project name"
                 >
 
-            </div>
-
-
-            <p id="projectError" class="error-message"></p>
-
-
-            <div class="dialog-footer">
-
-                <button
-                    type="button"
-                    id="cancelProjectBtn"
-                    class="secondary-btn"
-                >
-                    Cancel
-                </button>
-
-                <button
-                    type="button"
-                    id="createProjectBtn"
-                    class="primary-btn"
-                >
-                    Create Project
-                </button>
+                <p
+                    id="projectError"
+                    class="form-error"
+                ></p>
 
             </div>
+
+        </div>
+
+
+        <div class="dialog-footer">
+
+            <button
+                id="cancelProjectBtn"
+                type="button"
+                class="secondary-btn"
+            >
+                Cancel
+            </button>
+
+            <button
+                id="createProjectBtn"
+                type="button"
+                class="primary-btn"
+            >
+                Create Project
+            </button>
 
         </div>
 
     </dialog>
 
 
-    <!-- =====================================================
-         UNDO MESSAGE
-    ====================================================== -->
-
+    <!-- =========================
+         UNDO TOAST
+    ========================== -->
     <div
         id="undoToast"
-        class="undo-toast"
-        hidden
+        class="undo-toast hidden"
     >
 
         <span id="undoMessage">
@@ -1128,8 +1281,9 @@
         </span>
 
         <button
-            type="button"
             id="undoBtn"
+            type="button"
+            class="undo-btn"
         >
             Undo
         </button>
@@ -1137,14 +1291,10 @@
     </div>
 
 
-    <!-- =====================================================
+    <!-- =========================
          JAVASCRIPT
-    ====================================================== -->
-
-    <script
-        type="module"
-        src="app.js"
-    ></script>
+    ========================== -->
+    <script type="module" src="app.js"></script>
 
 </body>
 </html>
