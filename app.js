@@ -1,22 +1,8 @@
-/* =========================================================
-   TASK MANAGER V2
-   APP.JS
-
-   Main application logic:
-   - Login / Register
-   - Master Admin
-   - User dashboard
-   - Tasks
-   - Projects
-   - Kanban
-   - Search / Filter / Sort
-   - Task details
-   - Subtasks
-   - Import / Export
-   - Undo delete
-   - Admin assignment
-   - Admin reports
-========================================================= */
+// ========================================
+// APP.JS
+// Task Manager V2
+// Week 2 + Week 3 + Master Admin
+// ========================================
 
 import {
     loadUsers,
@@ -26,281 +12,275 @@ import {
     setCurrentUser,
     clearCurrentUser,
     isAdmin,
-    getAllRegularUsers,
     loadTasks,
     saveTasks,
     createTask,
-    createAssignedTask,
+    deleteTask,
     loadProjects,
     saveProjects,
     createProject,
     ensureDefaultProject,
+    deleteProject,
+    createAssignedTask,
     getUserDataForExport,
     importUserData
 } from "./storage.js";
 
 import {
-    renderTasks,
     renderProjects,
     renderProgress,
+    renderTasks,
+    renderEmptyState,
     renderBoard,
     renderTaskDetail,
     renderSubtasks,
+    renderAdminSummary,
     renderAdminUsers,
     renderAdminReports,
-    renderAdminSummary
+    renderAdminBoard,
+    renderUserSelect
 } from "./render.js";
 
 
-/* =========================================================
-   APP STATE
-========================================================= */
+// ========================================
+// STATE
+// ========================================
 
 let currentUser = null;
 
 let tasks = [];
-
 let projects = [];
 
-let activeProjectId = null;
+let activeProjectId = "";
 
 let currentView = "list";
-
 let currentCategory = "All";
-
 let searchText = "";
-
 let sortValue = "newest";
 
 let selectedTaskId = null;
 
 let deletedTaskBackup = null;
-
 let undoTimer = null;
 
 
-/* =========================================================
-   DOM HELPERS
-========================================================= */
+// ========================================
+// DOM HELPERS
+// ========================================
 
-const $ = selector =>
-    document.querySelector(selector);
+const $ = id => document.getElementById(id);
 
-const $$ = selector =>
-    [...document.querySelectorAll(selector)];
+const authScreen = $("authScreen");
+const loginSection = $("loginSection");
+const registerSection = $("registerSection");
 
-
-/* =========================================================
-   DOM ELEMENTS
-========================================================= */
-
-const authScreen = $("#authScreen");
-const loginSection = $("#loginSection");
-const registerSection = $("#registerSection");
-
-const loginForm = $("#loginForm");
-const registerForm = $("#registerForm");
-
-const loginEmail = $("#loginEmail");
-const loginPassword = $("#loginPassword");
-
-const registerName = $("#registerName");
-const registerEmail = $("#registerEmail");
-const registerPassword = $("#registerPassword");
-
-const loginError = $("#loginError");
-const registerError = $("#registerError");
-
-const showRegisterBtn = $("#showRegisterBtn");
-const showLoginBtn = $("#showLoginBtn");
-
-const appScreen = $("#appScreen");
-
-const welcomeMessage = $("#welcomeMessage");
-const currentUserRole = $("#currentUserRole");
-const logoutBtn = $("#logoutBtn");
-
-const adminDashboard = $("#adminDashboard");
-const userTaskManager = $("#userTaskManager");
+const appScreen = $("appScreen");
+const adminDashboard = $("adminDashboard");
+const userTaskManager = $("userTaskManager");
 
 
-/* =========================================================
-   SHOW / HIDE
-========================================================= */
+// ========================================
+// INITIALIZE
+// ========================================
 
-function show(element) {
+document.addEventListener("DOMContentLoaded", init);
 
-    if (element) {
-        element.hidden = false;
+function init() {
+
+    attachAuthEvents();
+    attachUserEvents();
+    attachAdminEvents();
+    attachDialogEvents();
+    attachKeyboardEvents();
+
+    const session = getCurrentUser();
+
+    if (session) {
+        openApplication(session);
+    } else {
+        showLogin();
     }
 }
 
 
-function hide(element) {
+// ========================================
+// AUTH EVENTS
+// ========================================
 
-    if (element) {
-        element.hidden = true;
-    }
+function attachAuthEvents() {
+
+    $("loginForm")?.addEventListener(
+        "submit",
+        handleLogin
+    );
+
+    $("registerForm")?.addEventListener(
+        "submit",
+        handleRegister
+    );
+
+    $("showRegisterBtn")?.addEventListener(
+        "click",
+        showRegister
+    );
+
+    $("showLoginBtn")?.addEventListener(
+        "click",
+        showLogin
+    );
+
+    $("logoutBtn")?.addEventListener(
+        "click",
+        handleLogout
+    );
 }
 
 
-/* =========================================================
-   AUTH SCREEN
-========================================================= */
-
-function showLogin() {
-
-    show(loginSection);
-    hide(registerSection);
-
-    if (loginError) {
-        loginError.textContent = "";
-    }
-
-    if (registerError) {
-        registerError.textContent = "";
-    }
-}
-
-
-function showRegister() {
-
-    hide(loginSection);
-    show(registerSection);
-
-    if (loginError) {
-        loginError.textContent = "";
-    }
-
-    if (registerError) {
-        registerError.textContent = "";
-    }
-}
-
-
-/* =========================================================
-   LOGIN
-========================================================= */
+// ========================================
+// LOGIN
+// ========================================
 
 function handleLogin(event) {
 
     event.preventDefault();
 
-    const email = loginEmail?.value.trim() || "";
-    const password = loginPassword?.value || "";
+    const email =
+        $("loginEmail").value.trim();
+
+    const password =
+        $("loginPassword").value;
+
+    const error =
+        $("loginError");
+
+    error.textContent = "";
 
     if (!email || !password) {
 
-        if (loginError) {
-            loginError.textContent =
-                "Please enter email and password.";
-        }
+        error.textContent =
+            "Please enter email and password.";
 
         return;
     }
 
-    const result = loginUser(
-        email,
-        password
-    );
+    const user =
+        loginUser(email, password);
 
-    if (!result.success) {
+    if (!user) {
 
-        if (loginError) {
-            loginError.textContent =
-                result.message;
-        }
+        error.textContent =
+            "Invalid email or password.";
 
         return;
     }
 
-    currentUser = result.user;
+    setCurrentUser(user);
 
-    setCurrentUser({
-        id: currentUser.id,
-        name: currentUser.name,
-        email: currentUser.email,
-        role: currentUser.role,
-        createdAt: currentUser.createdAt
-    });
-
-    if (loginForm) {
-        loginForm.reset();
-    }
-
-    openApplication();
+    openApplication(user);
 }
 
 
-/* =========================================================
-   REGISTER
-========================================================= */
+// ========================================
+// REGISTER
+// ========================================
 
 function handleRegister(event) {
 
     event.preventDefault();
 
-    const name = registerName?.value.trim() || "";
-    const email = registerEmail?.value.trim() || "";
-    const password = registerPassword?.value || "";
+    const name =
+        $("registerName").value.trim();
+
+    const email =
+        $("registerEmail").value.trim();
+
+    const password =
+        $("registerPassword").value;
+
+    const error =
+        $("registerError");
+
+    error.textContent = "";
 
     if (!name || !email || !password) {
 
-        if (registerError) {
-            registerError.textContent =
-                "Please fill all fields.";
-        }
+        error.textContent =
+            "Please fill all fields.";
 
         return;
     }
 
     if (password.length < 4) {
 
-        if (registerError) {
-            registerError.textContent =
-                "Password must be at least 4 characters.";
-        }
+        error.textContent =
+            "Password must contain at least 4 characters.";
 
         return;
     }
 
-    const result = registerUser(
-        name,
-        email,
-        password
-    );
+    const result =
+        registerUser(
+            name,
+            email,
+            password
+        );
 
     if (!result.success) {
 
-        if (registerError) {
-            registerError.textContent =
-                result.message;
-        }
+        error.textContent =
+            result.message ||
+            "Registration failed.";
 
         return;
     }
 
-    currentUser = result.user;
+    const user = result.user;
 
-    setCurrentUser({
-        id: currentUser.id,
-        name: currentUser.name,
-        email: currentUser.email,
-        role: currentUser.role,
-        createdAt: currentUser.createdAt
-    });
+    setCurrentUser(user);
 
-    if (registerForm) {
-        registerForm.reset();
-    }
+    $("registerForm").reset();
 
-    openApplication();
+    openApplication(user);
 }
 
 
-/* =========================================================
-   LOGOUT
-========================================================= */
+// ========================================
+// SHOW LOGIN
+// ========================================
+
+function showLogin() {
+
+    authScreen.hidden = false;
+
+    loginSection.hidden = false;
+    registerSection.hidden = true;
+
+    appScreen.hidden = true;
+
+    $("loginError").textContent = "";
+}
+
+
+// ========================================
+// SHOW REGISTER
+// ========================================
+
+function showRegister() {
+
+    authScreen.hidden = false;
+
+    loginSection.hidden = true;
+    registerSection.hidden = false;
+
+    appScreen.hidden = true;
+
+    $("registerError").textContent = "";
+}
+
+
+// ========================================
+// LOGOUT
+// ========================================
 
 function handleLogout() {
 
@@ -310,81 +290,76 @@ function handleLogout() {
 
     tasks = [];
     projects = [];
-    activeProjectId = null;
+
+    activeProjectId = "";
+
     selectedTaskId = null;
 
-    hide(appScreen);
-    show(authScreen);
-
     showLogin();
+
+    $("loginForm")?.reset();
 }
 
 
-/* =========================================================
-   OPEN APPLICATION
-========================================================= */
+// ========================================
+// OPEN APPLICATION
+// ========================================
 
-function openApplication() {
+function openApplication(user) {
 
-    hide(authScreen);
-    show(appScreen);
+    currentUser = user;
 
-    if (welcomeMessage) {
+    authScreen.hidden = true;
+    appScreen.hidden = false;
 
-        welcomeMessage.textContent =
-            `Welcome, ${currentUser.name}`;
-    }
+    $("welcomeMessage").textContent =
+        `Welcome, ${user.name}`;
 
-    if (currentUserRole) {
+    $("currentUserRole").textContent =
+        user.role === "admin"
+            ? "Master Admin"
+            : "User";
 
-        currentUserRole.textContent =
-            isAdmin(currentUser)
-                ? "Master Admin"
-                : "User";
-    }
+    if (isAdmin(user)) {
 
-    if (isAdmin(currentUser)) {
-
-        show(adminDashboard);
-        hide(userTaskManager);
+        adminDashboard.hidden = false;
+        userTaskManager.hidden = true;
 
         loadAdminDashboard();
 
     } else {
 
-        hide(adminDashboard);
-        show(userTaskManager);
+        adminDashboard.hidden = true;
+        userTaskManager.hidden = false;
 
         loadUserDashboard();
     }
 }
 
 
-/* =========================================================
-   USER DASHBOARD
-========================================================= */
+// ========================================
+// USER DASHBOARD
+// ========================================
 
 function loadUserDashboard() {
 
-    tasks = loadTasks(currentUser.id);
+    projects =
+        ensureDefaultProject(
+            currentUser.id
+        );
 
-    projects = loadProjects(currentUser.id);
+    tasks =
+        loadTasks(currentUser.id);
 
-    const defaultProject =
-        ensureDefaultProject(currentUser.id);
+    if (!projects.length) {
 
-    if (projects.length === 0 && defaultProject) {
-        projects = loadProjects(currentUser.id);
+        projects =
+            ensureDefaultProject(
+                currentUser.id
+            );
     }
 
-    if (!activeProjectId) {
-
-        activeProjectId =
-            projects[0]?.id || null;
-    }
-
-    if (
-        activeProjectId &&
+    if (!activeProjectId ||
         !projects.some(
             project =>
                 project.id === activeProjectId
@@ -392,33 +367,21 @@ function loadUserDashboard() {
     ) {
 
         activeProjectId =
-            projects[0]?.id || null;
+            projects[0]?.id || "";
     }
 
-    renderUserInterface();
+    renderUserDashboard();
 }
 
 
-/* =========================================================
-   USER INTERFACE
-========================================================= */
+// ========================================
+// RENDER USER DASHBOARD
+// ========================================
 
-function renderUserInterface() {
-
-    const projectSwitcher =
-        $("#projectSwitcher");
-
-    const activeProjectName =
-        $("#activeProjectName");
-
-    const progressText =
-        $("#progressText");
-
-    const progressFill =
-        $("#progressFill");
+function renderUserDashboard() {
 
     renderProjects(
-        projectSwitcher,
+        $("projectSwitcher"),
         projects,
         activeProjectId
     );
@@ -429,661 +392,491 @@ function renderUserInterface() {
                 project.id === activeProjectId
         );
 
-    if (activeProjectName) {
+    $("activeProjectName").textContent =
+        activeProject?.name ||
+        "My Tasks";
 
-        activeProjectName.textContent =
-            activeProject
-                ? activeProject.name
-                : "My Tasks";
-    }
+    const projectTasks =
+        getActiveProjectTasks();
 
-    renderFilteredTasks();
+    const filteredTasks =
+        getFilteredTasks(projectTasks);
 
     renderProgress(
-        progressText,
-        progressFill,
-        getProjectTasks()
+        $("progressText"),
+        $("progressFill"),
+        $("progressPercentage"),
+        projectTasks
     );
+
+    renderTasks(
+        $("taskList"),
+        filteredTasks
+    );
+
+    renderEmptyState(
+        $("emptyState"),
+        filteredTasks.length > 0
+    );
+
+    renderBoard(
+        filteredTasks,
+        {
+            todo: $("todoColumn"),
+            inProgress: $("inProgressColumn"),
+            inReview: $("inReviewColumn"),
+            done: $("doneColumn"),
+
+            todoCount: $("todoCount"),
+            inProgressCount: $("inProgressCount"),
+            inReviewCount: $("inReviewCount"),
+            doneCount: $("doneCount")
+        }
+    );
+
+    updateViewButtons();
+    updateViewVisibility();
 }
 
 
-/* =========================================================
-   PROJECT TASKS
-========================================================= */
+// ========================================
+// ACTIVE PROJECT TASKS
+// ========================================
 
-function getProjectTasks() {
+function getActiveProjectTasks() {
 
     if (!activeProjectId) {
         return tasks;
     }
 
-    return tasks.filter(
-        task =>
-            !task.projectId ||
-            task.projectId === activeProjectId
-    );
-}
-
-
-/* =========================================================
-   FILTER TASKS
-========================================================= */
-
-function getFilteredTasks() {
-
-    let result = getProjectTasks();
-
-    /* Category */
-
-    if (currentCategory !== "All") {
-
-        result = result.filter(
+    const projectTasks =
+        tasks.filter(
             task =>
-                task.category === currentCategory
+                task.projectId ===
+                activeProjectId
+        );
+
+    /*
+       Tasks created by Admin without
+       a project are shown in the
+       default project.
+    */
+
+    if (
+        projects.length &&
+        activeProjectId === projects[0].id
+    ) {
+
+        return tasks.filter(
+            task =>
+                task.projectId ===
+                    activeProjectId ||
+                !task.projectId
         );
     }
 
+    return projectTasks;
+}
 
-    /* Search */
 
+// ========================================
+// FILTER + SEARCH + SORT
+// ========================================
+
+function getFilteredTasks(sourceTasks) {
+
+    let result = [...sourceTasks];
+
+    // Category
+    if (currentCategory !== "All") {
+
+        result =
+            result.filter(
+                task =>
+                    task.category ===
+                    currentCategory
+            );
+    }
+
+    // Search
     if (searchText) {
 
         const query =
             searchText.toLowerCase();
 
-        result = result.filter(task => {
+        result =
+            result.filter(task => {
 
-            const title =
-                String(task.text || "")
-                    .toLowerCase();
+                const title =
+                    String(
+                        task.title || ""
+                    ).toLowerCase();
 
-            const description =
-                String(task.description || "")
-                    .toLowerCase();
+                const description =
+                    String(
+                        task.description || ""
+                    ).toLowerCase();
 
-            const category =
-                String(task.category || "")
-                    .toLowerCase();
+                const category =
+                    String(
+                        task.category || ""
+                    ).toLowerCase();
 
-            return (
-                title.includes(query) ||
-                description.includes(query) ||
-                category.includes(query)
-            );
-        });
+                return (
+                    title.includes(query) ||
+                    description.includes(query) ||
+                    category.includes(query)
+                );
+            });
     }
 
+    // Sort
+    result.sort(
+        (a, b) => {
 
-    /* Sort */
+            if (sortValue === "newest") {
 
-    result = [...result];
+                return (
+                    new Date(
+                        b.createdAt || 0
+                    ) -
+                    new Date(
+                        a.createdAt || 0
+                    )
+                );
+            }
 
-    if (sortValue === "newest") {
+            if (sortValue === "oldest") {
 
-        result.sort(
-            (a, b) =>
-                new Date(b.createdAt || 0) -
-                new Date(a.createdAt || 0)
-        );
+                return (
+                    new Date(
+                        a.createdAt || 0
+                    ) -
+                    new Date(
+                        b.createdAt || 0
+                    )
+                );
+            }
 
-    } else if (sortValue === "oldest") {
+            if (sortValue === "title") {
 
-        result.sort(
-            (a, b) =>
-                new Date(a.createdAt || 0) -
-                new Date(b.createdAt || 0)
-        );
+                return String(
+                    a.title || ""
+                ).localeCompare(
+                    String(
+                        b.title || ""
+                    )
+                );
+            }
 
-    } else if (sortValue === "a-z") {
+            if (sortValue === "priority") {
 
-        result.sort(
-            (a, b) =>
-                String(a.text)
-                    .localeCompare(String(b.text))
-        );
+                const priorityOrder = {
+                    High: 1,
+                    Medium: 2,
+                    Low: 3
+                };
 
-    } else if (sortValue === "z-a") {
+                return (
+                    (priorityOrder[a.priority] || 2) -
+                    (priorityOrder[b.priority] || 2)
+                );
+            }
 
-        result.sort(
-            (a, b) =>
-                String(b.text)
-                    .localeCompare(String(a.text))
-        );
-
-    } else if (sortValue === "priority") {
-
-        const priorityOrder = {
-            Urgent: 1,
-            High: 2,
-            Normal: 3,
-            Low: 4
-        };
-
-        result.sort(
-            (a, b) =>
-                (priorityOrder[a.priority] || 5) -
-                (priorityOrder[b.priority] || 5)
-        );
-    }
+            return 0;
+        }
+    );
 
     return result;
 }
 
 
-/* =========================================================
-   RENDER LIST + BOARD
-========================================================= */
+// ========================================
+// USER EVENTS
+// ========================================
 
-function renderFilteredTasks() {
+function attachUserEvents() {
 
-    const taskList =
-        $("#taskList");
-
-    const emptyState =
-        $("#emptyState");
-
-    const filtered =
-        getFilteredTasks();
-
-    renderTasks(
-        taskList,
-        filtered,
-        emptyState
+    $("addTaskBtn")?.addEventListener(
+        "click",
+        handleAddTask
     );
 
+    $("searchInput")?.addEventListener(
+        "input",
+        event => {
 
-    renderBoard(
-        {
-            todoColumn: $("#todoColumn"),
-            inProgressColumn: $("#inProgressColumn"),
-            inReviewColumn: $("#inReviewColumn"),
-            doneColumn: $("#doneColumn"),
+            searchText =
+                event.target.value.trim();
 
-            todoCount: $("#todoCount"),
-            inProgressCount: $("#inProgressCount"),
-            inReviewCount: $("#inReviewCount"),
-            doneCount: $("#doneCount")
-        },
-        filtered
+            renderUserDashboard();
+        }
     );
 
+    $("sortSelect")?.addEventListener(
+        "change",
+        event => {
 
-    if (currentView === "list") {
+            sortValue =
+                event.target.value;
 
-        show($("#taskList"));
-        hide($("#kanbanBoard"));
+            renderUserDashboard();
+        }
+    );
 
-    } else {
+    document
+        .querySelectorAll("[data-category]")
+        .forEach(button => {
 
-        hide($("#taskList"));
-        show($("#kanbanBoard"));
-    }
+            button.addEventListener(
+                "click",
+                () => {
+
+                    currentCategory =
+                        button.dataset.category ||
+                        "All";
+
+                    document
+                        .querySelectorAll(
+                            "[data-category]"
+                        )
+                        .forEach(item =>
+                            item.classList.remove(
+                                "active"
+                            )
+                        );
+
+                    button.classList.add(
+                        "active"
+                    );
+
+                    renderUserDashboard();
+                }
+            );
+        });
+
+    $("listViewBtn")?.addEventListener(
+        "click",
+        () => {
+
+            currentView = "list";
+
+            updateViewButtons();
+            updateViewVisibility();
+        }
+    );
+
+    $("boardViewBtn")?.addEventListener(
+        "click",
+        () => {
+
+            currentView = "board";
+
+            updateViewButtons();
+            updateViewVisibility();
+        }
+    );
+
+    $("projectSwitcher")?.addEventListener(
+        "click",
+        handleProjectClick
+    );
+
+    $("exportBtn")?.addEventListener(
+        "click",
+        handleExport
+    );
+
+    $("importFileInput")?.addEventListener(
+        "change",
+        handleImport
+    );
+
+    $("createProjectBtn")?.addEventListener(
+        "click",
+        handleCreateProject
+    );
+
+    $("cancelProjectBtn")?.addEventListener(
+        "click",
+        closeNewProjectDialog
+    );
+
+    $("closeNewProjectBtn")?.addEventListener(
+        "click",
+        closeNewProjectDialog
+    );
+
+    $("taskList")?.addEventListener(
+        "click",
+        handleTaskListClick
+    );
+
+    $("kanbanBoard")?.addEventListener(
+        "click",
+        handleTaskBoardClick
+    );
+
+    attachDragAndDrop();
 }
 
 
-/* =========================================================
-   ADD TASK
-========================================================= */
+// ========================================
+// ADD TASK
+// ========================================
 
 function handleAddTask() {
 
-    const taskInput =
-        $("#taskInput");
+    const input =
+        $("taskInput");
 
-    const categorySelect =
-        $("#categorySelect");
+    const title =
+        input.value.trim();
 
-    const statusSelect =
-        $("#statusSelect");
+    if (!title) {
 
-    const text =
-        taskInput?.value.trim() || "";
-
-    if (!text) {
-
-        taskInput?.focus();
+        input.focus();
 
         return;
     }
 
     const category =
-        categorySelect?.value || "Work";
+        $("categorySelect").value ||
+        "Personal";
 
     const status =
-        statusSelect?.value || "To Do";
-
+        $("statusSelect").value ||
+        "To Do";
 
     const task =
         createTask(
             currentUser.id,
             {
-                text,
+                title,
+                description: "",
                 category,
                 status,
-                priority: "Normal",
+                priority: "Medium",
+                dueDate: "",
                 projectId: activeProjectId
             }
         );
 
-    if (!task) {
-        return;
-    }
+    tasks.push(task);
 
-    tasks = loadTasks(currentUser.id);
+    saveTasks(
+        currentUser.id,
+        tasks
+    );
 
-    if (taskInput) {
-        taskInput.value = "";
-    }
+    input.value = "";
 
-    renderUserInterface();
+    input.focus();
 
-    taskInput?.focus();
+    renderUserDashboard();
 }
 
 
-/* =========================================================
-   PROJECT SELECTION
-========================================================= */
+// ========================================
+// PROJECT CLICK
+// ========================================
 
 function handleProjectClick(event) {
 
-    const button =
+    const item =
         event.target.closest(
             "[data-project-id]"
         );
 
-    if (!button) {
-        return;
-    }
+    if (!item) return;
 
     activeProjectId =
-        button.dataset.projectId;
+        item.dataset.projectId;
 
-    renderUserInterface();
+    currentCategory = "All";
+    searchText = "";
+
+    if ($("searchInput")) {
+        $("searchInput").value = "";
+    }
+
+    renderUserDashboard();
 }
 
 
-/* =========================================================
-   NEW PROJECT DIALOG
-========================================================= */
-
-function openNewProjectDialog() {
-
-    const dialog =
-        $("#newProjectDialog");
-
-    const input =
-        $("#projectNameInput");
-
-    const error =
-        $("#projectError");
-
-    if (error) {
-        error.textContent = "";
-    }
-
-    if (input) {
-        input.value = "";
-    }
-
-    if (dialog) {
-        dialog.showModal();
-    }
-
-    setTimeout(() => {
-        input?.focus();
-    }, 50);
-}
-
-
-function closeNewProjectDialog() {
-
-    const dialog =
-        $("#newProjectDialog");
-
-    if (dialog?.open) {
-        dialog.close();
-    }
-}
-
-
-function handleCreateProject() {
-
-    const input =
-        $("#projectNameInput");
-
-    const error =
-        $("#projectError");
-
-    const name =
-        input?.value.trim() || "";
-
-    if (!name) {
-
-        if (error) {
-            error.textContent =
-                "Please enter a project name.";
-        }
-
-        return;
-    }
-
-    const project =
-        createProject(
-            currentUser.id,
-            name
-        );
-
-    if (!project) {
-        return;
-    }
-
-    projects =
-        loadProjects(currentUser.id);
-
-    activeProjectId =
-        project.id;
-
-    closeNewProjectDialog();
-
-    renderUserInterface();
-}
-
-
-/* =========================================================
-   TASK OPEN
-========================================================= */
-
-function openTaskDetail(taskId) {
-
-    const task =
-        tasks.find(
-            item => item.id === taskId
-        );
-
-    if (!task) {
-        return;
-    }
-
-    selectedTaskId = taskId;
-
-    renderTaskDetail(
-        task,
-        {
-            title: $("#detailTaskTitle"),
-            description: $("#detailDescription"),
-            status: $("#detailStatus"),
-            priority: $("#detailPriority"),
-            dueDate: $("#detailDueDate"),
-            category: $("#detailCategory"),
-            notes: $("#taskNotes")
-        }
-    );
-
-    renderSubtasks(
-        $("#subtaskList"),
-        task.subtasks
-    );
-
-    const dialog =
-        $("#taskDetailDialog");
-
-    if (dialog) {
-        dialog.showModal();
-    }
-}
-
-
-/* =========================================================
-   CLOSE TASK DETAIL
-========================================================= */
-
-function closeTaskDetail() {
-
-    const dialog =
-        $("#taskDetailDialog");
-
-    if (dialog?.open) {
-        dialog.close();
-    }
-
-    selectedTaskId = null;
-}
-
-
-/* =========================================================
-   SAVE TASK DETAIL
-========================================================= */
-
-function saveTaskDetail() {
-
-    if (!selectedTaskId) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                item.id === selectedTaskId
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const title =
-        $("#detailTaskTitle");
-
-    const description =
-        $("#detailDescription");
-
-    const notes =
-        $("#taskNotes");
-
-
-    const newTitle =
-        title?.value.trim() || "";
-
-    if (newTitle) {
-        task.text = newTitle;
-    }
-
-    task.description =
-        description?.value || "";
-
-    task.notes =
-        notes?.value || "";
-
-    task.updatedAt =
-        new Date().toISOString();
-
-    saveTasks(
-        currentUser.id,
-        tasks
-    );
-
-    tasks =
-        loadTasks(currentUser.id);
-
-    renderUserInterface();
-
-    closeTaskDetail();
-}
-
-
-/* =========================================================
-   ADD SUBTASK
-========================================================= */
-
-function handleAddSubtask() {
-
-    if (!selectedTaskId) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                item.id === selectedTaskId
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const input =
-        $("#subtaskInput");
-
-    const text =
-        input?.value.trim() || "";
-
-    if (!text) {
-        input?.focus();
-        return;
-    }
-
-    if (!Array.isArray(task.subtasks)) {
-        task.subtasks = [];
-    }
-
-    task.subtasks.push({
-        id:
-            `${Date.now()}-${Math.random()}`,
-        text,
-        done: false
-    });
-
-    task.updatedAt =
-        new Date().toISOString();
-
-    saveTasks(
-        currentUser.id,
-        tasks
-    );
-
-    tasks =
-        loadTasks(currentUser.id);
-
-    if (input) {
-        input.value = "";
-    }
-
-    renderSubtasks(
-        $("#subtaskList"),
-        task.subtasks
-    );
-}
-
-
-/* =========================================================
-   SUBTASK CLICK
-========================================================= */
-
-function handleSubtaskClick(event) {
-
-    if (!selectedTaskId) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                item.id === selectedTaskId
-        );
-
-    if (!task) {
-        return;
-    }
-
-
-    const checkbox =
-        event.target.closest(
-            ".subtask-checkbox"
-        );
-
-    if (checkbox) {
-
-        const subtaskId =
-            checkbox.dataset.subtaskId;
-
-        const subtask =
-            task.subtasks?.find(
-                item =>
-                    item.id === subtaskId
-            );
-
-        if (subtask) {
-
-            subtask.done =
-                checkbox.checked;
-
-            task.updatedAt =
-                new Date().toISOString();
-
-            saveTasks(
-                currentUser.id,
-                tasks
-            );
-
-            renderSubtasks(
-                $("#subtaskList"),
-                task.subtasks
-            );
-        }
-
-        return;
-    }
-
+// ========================================
+// TASK LIST CLICK
+// ========================================
+
+function handleTaskListClick(event) {
 
     const deleteButton =
-        event.target.closest(
-            ".delete-subtask-btn"
-        );
-
-    if (deleteButton) {
-
-        const subtaskId =
-            deleteButton.dataset.subtaskId;
-
-        task.subtasks =
-            task.subtasks.filter(
-                item =>
-                    item.id !== subtaskId
-            );
-
-        task.updatedAt =
-            new Date().toISOString();
-
-        saveTasks(
-            currentUser.id,
-            tasks
-        );
-
-        renderSubtasks(
-            $("#subtaskList"),
-            task.subtasks
-        );
-    }
-}
-
-
-/* =========================================================
-   DELETE TASK
-========================================================= */
-
-function handleTaskDelete(event) {
-
-    const button =
         event.target.closest(
             "[data-delete-task]"
         );
 
-    if (!button) {
+    if (deleteButton) {
+
+        deleteUserTask(
+            deleteButton.dataset.deleteTask
+        );
+
         return;
     }
 
-    const taskId =
-        button.dataset.deleteTask;
+    const openButton =
+        event.target.closest(
+            "[data-open-task]"
+        );
+
+    if (openButton) {
+
+        openTaskDetail(
+            openButton.dataset.openTask
+        );
+    }
+}
+
+
+// ========================================
+// KANBAN CLICK
+// ========================================
+
+function handleTaskBoardClick(event) {
+
+    const deleteButton =
+        event.target.closest(
+            "[data-delete-task]"
+        );
+
+    if (deleteButton) {
+
+        deleteUserTask(
+            deleteButton.dataset.deleteTask
+        );
+
+        return;
+    }
+
+    const openButton =
+        event.target.closest(
+            "[data-open-task]"
+        );
+
+    if (openButton) {
+
+        openTaskDetail(
+            openButton.dataset.openTask
+        );
+    }
+}
+
+
+// ========================================
+// DELETE TASK
+// ========================================
+
+function deleteUserTask(taskId) {
 
     const index =
         tasks.findIndex(
@@ -1091,20 +884,11 @@ function handleTaskDelete(event) {
                 task.id === taskId
         );
 
-    if (index === -1) {
-        return;
-    }
+    if (index === -1) return;
 
     deletedTaskBackup = {
         task: {
-            ...tasks[index],
-            subtasks: Array.isArray(
-                tasks[index].subtasks
-            )
-                ? tasks[index].subtasks.map(
-                    item => ({ ...item })
-                )
-                : []
+            ...tasks[index]
         },
         index
     };
@@ -1116,87 +900,273 @@ function handleTaskDelete(event) {
         tasks
     );
 
-    renderUserInterface();
-
     showUndoToast();
 
-    clearTimeout(undoTimer);
-
-    undoTimer =
-        setTimeout(() => {
-            deletedTaskBackup = null;
-            hideUndoToast();
-        }, 5000);
+    renderUserDashboard();
 }
 
 
-/* =========================================================
-   UNDO DELETE
-========================================================= */
-
-function handleUndo() {
-
-    if (!deletedTaskBackup) {
-        return;
-    }
-
-    const backup =
-        deletedTaskBackup;
-
-    tasks.splice(
-        backup.index,
-        0,
-        backup.task
-    );
-
-    saveTasks(
-        currentUser.id,
-        tasks
-    );
-
-    deletedTaskBackup = null;
-
-    clearTimeout(undoTimer);
-
-    hideUndoToast();
-
-    renderUserInterface();
-}
-
+// ========================================
+// UNDO
+// ========================================
 
 function showUndoToast() {
 
     const toast =
-        $("#undoToast");
+        $("undoToast");
 
     const message =
-        $("#undoMessage");
+        $("undoMessage");
+
+    if (!toast) return;
 
     if (message) {
         message.textContent =
             "Task deleted — Undo";
     }
 
-    if (toast) {
-        toast.hidden = false;
+    toast.hidden = false;
+
+    clearTimeout(undoTimer);
+
+    undoTimer =
+        setTimeout(
+            () => {
+
+                toast.hidden = true;
+
+                deletedTaskBackup = null;
+
+            },
+            5000
+        );
+}
+
+
+// ========================================
+// UNDO BUTTON
+// ========================================
+
+function attachUndoEvent() {
+
+    $("undoBtn")?.addEventListener(
+        "click",
+        () => {
+
+            if (!deletedTaskBackup) {
+                return;
+            }
+
+            const {
+                task,
+                index
+            } = deletedTaskBackup;
+
+            tasks.splice(
+                Math.min(index, tasks.length),
+                0,
+                task
+            );
+
+            saveTasks(
+                currentUser.id,
+                tasks
+            );
+
+            deletedTaskBackup = null;
+
+            clearTimeout(undoTimer);
+
+            $("undoToast").hidden = true;
+
+            renderUserDashboard();
+        }
+    );
+}
+
+
+// ========================================
+// VIEW SWITCH
+// ========================================
+
+function updateViewButtons() {
+
+    $("listViewBtn")
+        ?.classList.toggle(
+            "active",
+            currentView === "list"
+        );
+
+    $("boardViewBtn")
+        ?.classList.toggle(
+            "active",
+            currentView === "board"
+        );
+}
+
+function updateViewVisibility() {
+
+    const list =
+        $("taskList");
+
+    const empty =
+        $("emptyState");
+
+    const board =
+        $("kanbanBoard");
+
+    if (currentView === "list") {
+
+        if (list) list.hidden = false;
+        if (empty) empty.hidden = false;
+        if (board) board.hidden = true;
+
+    } else {
+
+        if (list) list.hidden = true;
+        if (empty) empty.hidden = true;
+        if (board) board.hidden = false;
     }
 }
 
 
-function hideUndoToast() {
+// ========================================
+// DRAG AND DROP
+// ========================================
 
-    const toast =
-        $("#undoToast");
+function attachDragAndDrop() {
 
-    if (toast) {
-        toast.hidden = true;
-    }
+    document.addEventListener(
+        "dragstart",
+        event => {
+
+            const card =
+                event.target.closest(
+                    ".task-card"
+                );
+
+            if (!card) return;
+
+            card.classList.add(
+                "dragging"
+            );
+
+            event.dataTransfer.setData(
+                "text/plain",
+                card.dataset.taskId
+            );
+        }
+    );
+
+    document.addEventListener(
+        "dragend",
+        event => {
+
+            const card =
+                event.target.closest(
+                    ".task-card"
+                );
+
+            if (!card) return;
+
+            card.classList.remove(
+                "dragging"
+            );
+        }
+    );
+
+    document.addEventListener(
+        "dragover",
+        event => {
+
+            const column =
+                event.target.closest(
+                    ".kanban-column"
+                );
+
+            if (!column) return;
+
+            event.preventDefault();
+        }
+    );
+
+    document.addEventListener(
+        "drop",
+        event => {
+
+            const column =
+                event.target.closest(
+                    ".kanban-column"
+                );
+
+            if (!column) return;
+
+            event.preventDefault();
+
+            const taskId =
+                event.dataTransfer.getData(
+                    "text/plain"
+                );
+
+            if (!taskId) return;
+
+            const newStatus =
+                getStatusFromColumn(
+                    column
+                );
+
+            if (!newStatus) return;
+
+            updateTaskStatus(
+                taskId,
+                newStatus
+            );
+        }
+    );
 }
 
 
-/* =========================================================
-   STATUS UPDATE
-========================================================= */
+// ========================================
+// STATUS FROM COLUMN
+// ========================================
+
+function getStatusFromColumn(column) {
+
+    if (
+        column.id === "todoColumn" ||
+        column.id === "adminTodoColumn"
+    ) {
+        return "To Do";
+    }
+
+    if (
+        column.id === "inProgressColumn" ||
+        column.id === "adminInProgressColumn"
+    ) {
+        return "In Progress";
+    }
+
+    if (
+        column.id === "inReviewColumn" ||
+        column.id === "adminInReviewColumn"
+    ) {
+        return "In Review";
+    }
+
+    if (
+        column.id === "doneColumn" ||
+        column.id === "adminDoneColumn"
+    ) {
+        return "Done";
+    }
+
+    return null;
+}
+
+
+// ========================================
+// UPDATE USER TASK STATUS
+// ========================================
 
 function updateTaskStatus(
     taskId,
@@ -1209,12 +1179,12 @@ function updateTaskStatus(
                 item.id === taskId
         );
 
-    if (!task) {
-        return;
-    }
+    if (!task) return;
 
-    task.status =
-        newStatus;
+    task.status = newStatus;
+
+    task.completed =
+        newStatus === "Done";
 
     task.updatedAt =
         new Date().toISOString();
@@ -1224,301 +1194,434 @@ function updateTaskStatus(
         tasks
     );
 
-    renderUserInterface();
+    renderUserDashboard();
 }
 
 
-/* =========================================================
-   KANBAN DRAG & DROP
-========================================================= */
+// ========================================
+// TASK DETAIL DIALOG
+// ========================================
 
-let draggedTaskId = null;
+function attachDialogEvents() {
 
+    attachUndoEvent();
 
-function handleDragStart(event) {
-
-    const card =
-        event.target.closest(
-            "[data-task-id]"
+    $("closeTaskDetailBtn")
+        ?.addEventListener(
+            "click",
+            closeTaskDetail
         );
 
-    if (!card) {
-        return;
-    }
+    $("closeTaskDetailBtnBottom")
+        ?.addEventListener(
+            "click",
+            closeTaskDetail
+        );
 
-    draggedTaskId =
-        card.dataset.taskId;
+    $("saveNotesBtn")
+        ?.addEventListener(
+            "click",
+            saveTaskDetails
+        );
 
-    event.dataTransfer.effectAllowed =
-        "move";
+    $("addSubtaskBtn")
+        ?.addEventListener(
+            "click",
+            addSubtask
+        );
 
-    event.dataTransfer.setData(
-        "text/plain",
-        draggedTaskId
+    $("subtaskList")
+        ?.addEventListener(
+            "click",
+            handleSubtaskClick
+        );
+
+    $("subtaskList")
+        ?.addEventListener(
+            "change",
+            handleSubtaskChange
+        );
+}
+
+
+// ========================================
+// OPEN TASK DETAIL
+// ========================================
+
+function openTaskDetail(taskId) {
+
+    const task =
+        tasks.find(
+            item =>
+                item.id === taskId
+        );
+
+    if (!task) return;
+
+    selectedTaskId = taskId;
+
+    renderTaskDetail(
+        task,
+        {
+            title: $("detailTaskTitle"),
+            description: $("detailDescription"),
+            status: $("detailStatus"),
+            priority: $("detailPriority"),
+            dueDate: $("detailDueDate"),
+            category: $("detailCategory"),
+            notes: $("taskNotes")
+        }
     );
-}
 
-
-function handleBoardDragOver(event) {
-
-    const column =
-        event.target.closest(
-            "[data-status]"
-        );
-
-    if (!column) {
-        return;
-    }
-
-    event.preventDefault();
-
-    event.dataTransfer.dropEffect =
-        "move";
-}
-
-
-function handleBoardDrop(event) {
-
-    const column =
-        event.target.closest(
-            "[data-status]"
-        );
-
-    if (!column) {
-        return;
-    }
-
-    event.preventDefault();
-
-    const taskId =
-        event.dataTransfer.getData(
-            "text/plain"
-        ) || draggedTaskId;
-
-    const newStatus =
-        column.dataset.status;
-
-    if (taskId && newStatus) {
-
-        updateTaskStatus(
-            taskId,
-            newStatus
-        );
-    }
-
-    draggedTaskId = null;
-}
-
-
-/* =========================================================
-   LIST DRAG & DROP
-========================================================= */
-
-function handleListDragStart(event) {
-
-    const card =
-        event.target.closest(
-            ".task-card"
-        );
-
-    if (!card) {
-        return;
-    }
-
-    draggedTaskId =
-        card.dataset.taskId;
-
-    event.dataTransfer.effectAllowed =
-        "move";
-
-    event.dataTransfer.setData(
-        "text/plain",
-        draggedTaskId
+    renderSubtasks(
+        $("subtaskList"),
+        task.subtasks || []
     );
+
+    const dialog =
+        $("taskDetailDialog");
+
+    if (dialog) {
+
+        if (typeof dialog.showModal === "function") {
+            dialog.showModal();
+        } else {
+            dialog.hidden = false;
+        }
+    }
 }
 
 
-function handleListDragOver(event) {
+// ========================================
+// CLOSE TASK DETAIL
+// ========================================
 
-    const card =
-        event.target.closest(
-            ".task-card"
-        );
+function closeTaskDetail() {
 
-    if (!card) {
-        return;
-    }
+    const dialog =
+        $("taskDetailDialog");
 
-    event.preventDefault();
-}
-
-
-function handleListDrop(event) {
-
-    const targetCard =
-        event.target.closest(
-            ".task-card"
-        );
-
-    if (!targetCard) {
-        return;
-    }
-
-    event.preventDefault();
-
-    const draggedId =
-        event.dataTransfer.getData(
-            "text/plain"
-        ) || draggedTaskId;
-
-    const targetId =
-        targetCard.dataset.taskId;
-
-    if (!draggedId || !targetId) {
-        return;
-    }
-
-    if (draggedId === targetId) {
-        return;
-    }
-
-    const draggedIndex =
-        tasks.findIndex(
-            task =>
-                task.id === draggedId
-        );
-
-    const targetIndex =
-        tasks.findIndex(
-            task =>
-                task.id === targetId
-        );
+    if (!dialog) return;
 
     if (
-        draggedIndex === -1 ||
-        targetIndex === -1
+        typeof dialog.close === "function"
     ) {
-        return;
+        dialog.close();
+    } else {
+        dialog.hidden = true;
     }
 
-    const [movedTask] =
-        tasks.splice(
-            draggedIndex,
-            1
+    selectedTaskId = null;
+}
+
+
+// ========================================
+// SAVE TASK DETAILS
+// ========================================
+
+function saveTaskDetails() {
+
+    if (!selectedTaskId) return;
+
+    const task =
+        tasks.find(
+            item =>
+                item.id ===
+                selectedTaskId
         );
 
-    tasks.splice(
-        targetIndex,
-        0,
-        movedTask
-    );
+    if (!task) return;
+
+    task.title =
+        $("detailTaskTitle").value.trim() ||
+        task.title;
+
+    task.description =
+        $("detailDescription").value.trim();
+
+    task.notes =
+        $("taskNotes").value;
+
+    task.updatedAt =
+        new Date().toISOString();
 
     saveTasks(
         currentUser.id,
         tasks
     );
 
-    renderUserInterface();
+    renderUserDashboard();
 
-    draggedTaskId = null;
+    closeTaskDetail();
 }
 
 
-/* =========================================================
-   SEARCH
-========================================================= */
+// ========================================
+// ADD SUBTASK
+// ========================================
 
-function handleSearch(event) {
+function addSubtask() {
 
-    searchText =
-        event.target.value.trim();
+    if (!selectedTaskId) return;
 
-    renderFilteredTasks();
+    const input =
+        $("subtaskInput");
+
+    const title =
+        input.value.trim();
+
+    if (!title) return;
+
+    const task =
+        tasks.find(
+            item =>
+                item.id ===
+                selectedTaskId
+        );
+
+    if (!task) return;
+
+    if (!Array.isArray(task.subtasks)) {
+        task.subtasks = [];
+    }
+
+    task.subtasks.push({
+        id: createId(),
+        title,
+        completed: false
+    });
+
+    saveTasks(
+        currentUser.id,
+        tasks
+    );
+
+    input.value = "";
+
+    renderSubtasks(
+        $("subtaskList"),
+        task.subtasks
+    );
 }
 
 
-/* =========================================================
-   CATEGORY FILTER
-========================================================= */
+// ========================================
+// SUBTASK CLICK
+// ========================================
 
-function handleCategoryFilter(event) {
+function handleSubtaskClick(event) {
 
     const button =
         event.target.closest(
-            "[data-category]"
+            "[data-delete-subtask]"
         );
 
-    if (!button) {
+    if (!button) return;
+
+    if (!selectedTaskId) return;
+
+    const task =
+        tasks.find(
+            item =>
+                item.id ===
+                selectedTaskId
+        );
+
+    if (!task) return;
+
+    task.subtasks =
+        (task.subtasks || [])
+            .filter(
+                subtask =>
+                    subtask.id !==
+                    button.dataset.deleteSubtask
+            );
+
+    saveTasks(
+        currentUser.id,
+        tasks
+    );
+
+    renderSubtasks(
+        $("subtaskList"),
+        task.subtasks
+    );
+}
+
+
+// ========================================
+// SUBTASK CHANGE
+// ========================================
+
+function handleSubtaskChange(event) {
+
+    const checkbox =
+        event.target.closest(
+            "[data-subtask-id]"
+        );
+
+    if (!checkbox) return;
+
+    if (!selectedTaskId) return;
+
+    const task =
+        tasks.find(
+            item =>
+                item.id ===
+                selectedTaskId
+        );
+
+    if (!task) return;
+
+    const subtask =
+        (task.subtasks || [])
+            .find(
+                item =>
+                    item.id ===
+                    checkbox.dataset.subtaskId
+            );
+
+    if (!subtask) return;
+
+    subtask.completed =
+        checkbox.checked;
+
+    saveTasks(
+        currentUser.id,
+        tasks
+    );
+
+    renderSubtasks(
+        $("subtaskList"),
+        task.subtasks
+    );
+}
+
+
+// ========================================
+// NEW PROJECT
+// ========================================
+
+function openNewProjectDialog() {
+
+    const dialog =
+        $("newProjectDialog");
+
+    if (!dialog) return;
+
+    $("projectNameInput").value = "";
+    $("projectError").textContent = "";
+
+    if (
+        typeof dialog.showModal === "function"
+    ) {
+        dialog.showModal();
+    } else {
+        dialog.hidden = false;
+    }
+}
+
+function closeNewProjectDialog() {
+
+    const dialog =
+        $("newProjectDialog");
+
+    if (!dialog) return;
+
+    if (
+        typeof dialog.close === "function"
+    ) {
+        dialog.close();
+    } else {
+        dialog.hidden = true;
+    }
+}
+
+
+// ========================================
+// CREATE PROJECT
+// ========================================
+
+function handleCreateProject() {
+
+    const input =
+        $("projectNameInput");
+
+    const error =
+        $("projectError");
+
+    const name =
+        input.value.trim();
+
+    error.textContent = "";
+
+    if (!name) {
+
+        error.textContent =
+            "Please enter project name.";
+
         return;
     }
 
-    currentCategory =
-        button.dataset.category;
+    const duplicate =
+        projects.some(
+            project =>
+                project.name.toLowerCase() ===
+                name.toLowerCase()
+        );
 
-    $$("[data-category]").forEach(
-        item => {
-            item.classList.toggle(
-                "active",
-                item.dataset.category ===
-                    currentCategory
-            );
-        }
+    if (duplicate) {
+
+        error.textContent =
+            "Project already exists.";
+
+        return;
+    }
+
+    const project =
+        createProject(
+            currentUser.id,
+            name
+        );
+
+    projects.push(project);
+
+    saveProjects(
+        currentUser.id,
+        projects
     );
 
-    renderFilteredTasks();
+    activeProjectId =
+        project.id;
+
+    closeNewProjectDialog();
+
+    renderUserDashboard();
 }
 
 
-/* =========================================================
-   SORT
-========================================================= */
+// ========================================
+// NEW PROJECT BUTTON
+// ========================================
 
-function handleSort(event) {
+document.addEventListener(
+    "click",
+    event => {
 
-    sortValue =
-        event.target.value;
-
-    renderFilteredTasks();
-}
-
-
-/* =========================================================
-   VIEW SWITCH
-========================================================= */
-
-function setView(view) {
-
-    currentView = view;
-
-    const listButton =
-        $("#listViewBtn");
-
-    const boardButton =
-        $("#boardViewBtn");
-
-    if (listButton) {
-
-        listButton.classList.toggle(
-            "active",
-            view === "list"
-        );
+        if (
+            event.target.closest(
+                "#newProjectBtn"
+            )
+        ) {
+            openNewProjectDialog();
+        }
     }
-
-    if (boardButton) {
-
-        boardButton.classList.toggle(
-            "active",
-            view === "board"
-        );
-    }
-
-    renderFilteredTasks();
-}
+);
 
 
-/* =========================================================
-   EXPORT
-========================================================= */
+// ========================================
+// EXPORT
+// ========================================
 
 function handleExport() {
 
@@ -1529,7 +1632,13 @@ function handleExport() {
 
     const blob =
         new Blob(
-            [JSON.stringify(data, null, 2)],
+            [
+                JSON.stringify(
+                    data,
+                    null,
+                    2
+                )
+            ],
             {
                 type: "application/json"
             }
@@ -1556,874 +1665,133 @@ function handleExport() {
 }
 
 
-/* =========================================================
-   IMPORT
-========================================================= */
+// ========================================
+// IMPORT
+// ========================================
 
-function handleImport(event) {
+async function handleImport(event) {
 
     const file =
         event.target.files?.[0];
 
-    if (!file) {
-        return;
-    }
+    if (!file) return;
 
-    const reader =
-        new FileReader();
+    try {
 
-    reader.onload = () => {
+        const text =
+            await file.text();
 
-        try {
+        const data =
+            JSON.parse(text);
 
-            const data =
-                JSON.parse(
-                    reader.result
-                );
-
-            if (
-                !Array.isArray(data.tasks) &&
-                !Array.isArray(data.projects)
-            ) {
-
-                alert(
-                    "Invalid task manager JSON file."
-                );
-
-                return;
-            }
-
+        const result =
             importUserData(
                 currentUser.id,
                 data
             );
 
-            tasks =
-                loadTasks(currentUser.id);
-
-            projects =
-                loadProjects(currentUser.id);
-
-            if (projects.length === 0) {
-
-                const defaultProject =
-                    ensureDefaultProject(
-                        currentUser.id
-                    );
-
-                projects =
-                    loadProjects(
-                        currentUser.id
-                    );
-
-                activeProjectId =
-                    defaultProject?.id || null;
-            } else if (
-                !projects.some(
-                    project =>
-                        project.id ===
-                        activeProjectId
-                )
-            ) {
-
-                activeProjectId =
-                    projects[0].id;
-            }
-
-            renderUserInterface();
+        if (!result.success) {
 
             alert(
-                "Tasks imported successfully."
+                result.message ||
+                "Import failed."
             );
 
-        } catch (error) {
-
-            console.error(error);
-
-            alert(
-                "Could not import the JSON file."
-            );
-        }
-    };
-
-    reader.readAsText(file);
-
-    event.target.value = "";
-}
-
-
-/* =========================================================
-   ADMIN DASHBOARD
-========================================================= */
-
-function loadAdminDashboard() {
-
-    const users =
-        getAllRegularUsers();
-
-    const stats = {};
-
-    let totalTasks = 0;
-    let pendingTasks = 0;
-    let completedTasks = 0;
-
-    let todoTasks = 0;
-    let inProgressTasks = 0;
-    let inReviewTasks = 0;
-    let doneTasks = 0;
-
-
-    users.forEach(user => {
-
-        const userTasks =
-            loadTasks(user.id);
-
-        const total =
-            userTasks.length;
-
-        const completed =
-            userTasks.filter(
-                task =>
-                    task.status === "Done"
-            ).length;
-
-        const pending =
-            total - completed;
-
-        stats[user.id] = {
-            total,
-            completed,
-            pending
-        };
-
-
-        totalTasks += total;
-
-        completedTasks += completed;
-
-        pendingTasks += pending;
-
-
-        userTasks.forEach(task => {
-
-            if (task.status === "To Do") {
-                todoTasks++;
-            }
-
-            if (task.status === "In Progress") {
-                inProgressTasks++;
-            }
-
-            if (task.status === "In Review") {
-                inReviewTasks++;
-            }
-
-            if (task.status === "Done") {
-                doneTasks++;
-            }
-        });
-    });
-
-
-    renderAdminSummary(
-        {
-            totalUsers:
-                $("#adminTotalUsers"),
-
-            totalTasks:
-                $("#adminTotalTasks"),
-
-            pendingTasks:
-                $("#adminPendingTasks"),
-
-            completedTasks:
-                $("#adminCompletedTasks"),
-
-            todoTasks:
-                $("#adminTodoTasks"),
-
-            inProgressTasks:
-                $("#adminInProgressTasks"),
-
-            inReviewTasks:
-                $("#adminInReviewTasks"),
-
-            doneTasks:
-                $("#adminDoneTasks")
-        },
-        {
-            totalUsers: users.length,
-            totalTasks,
-            pendingTasks,
-            completedTasks,
-            todoTasks,
-            inProgressTasks,
-            inReviewTasks,
-            doneTasks
-        }
-    );
-
-
-    renderAdminUsers(
-        $("#adminUsersList"),
-        users,
-        stats
-    );
-
-
-    const reports =
-        users.map(user => {
-
-            const userTasks =
-                loadTasks(user.id);
-
-            const total =
-                userTasks.length;
-
-            const completed =
-                userTasks.filter(
-                    task =>
-                        task.status === "Done"
-                ).length;
-
-            return {
-                user,
-                tasks: userTasks,
-                total,
-                completed,
-                pending:
-                    total - completed,
-                progress:
-                    total > 0
-                        ? Math.round(
-                            (completed / total) * 100
-                        )
-                        : 0
-            };
-        });
-
-
-    renderAdminReports(
-        $("#adminReportsList"),
-        reports
-    );
-
-
-    renderAdminBoard();
-    populateAdminUserSelect();
-}
-
-
-/* =========================================================
-   ADMIN USER SELECT
-========================================================= */
-
-function populateAdminUserSelect() {
-
-    const select =
-        $("#adminUserSelect");
-
-    if (!select) {
-        return;
-    }
-
-    const users =
-        getAllRegularUsers();
-
-    select.innerHTML =
-        `<option value="">
-            Select a user
-        </option>` +
-        users
-            .map(
-                user => `
-                    <option value="${escapeAttribute(user.id)}">
-                        ${escapeHTML(user.name)}
-                    </option>
-                `
-            )
-            .join("");
-}
-
-
-/* =========================================================
-   HTML ESCAPE
-========================================================= */
-
-function escapeHTML(value) {
-
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-
-function escapeAttribute(value) {
-
-    return escapeHTML(value);
-}
-
-
-/* =========================================================
-   ADMIN ASSIGN TASK
-========================================================= */
-
-function handleAdminAssignTask(event) {
-
-    event.preventDefault();
-
-    const userId =
-        $("#adminUserSelect")?.value || "";
-
-    const title =
-        $("#adminTaskTitle")?.value.trim() || "";
-
-    const description =
-        $("#adminTaskDescription")?.value || "";
-
-    const category =
-        $("#adminTaskCategory")?.value || "Work";
-
-    const priority =
-        $("#adminTaskPriority")?.value || "Normal";
-
-    const dueDate =
-        $("#adminTaskDueDate")?.value || "";
-
-    const projectId =
-        $("#adminTaskProject")?.value || null;
-
-    const message =
-        $("#adminAssignMessage");
-
-
-    if (!userId) {
-
-        if (message) {
-            message.textContent =
-                "Please select a user.";
-        }
-
-        return;
-    }
-
-
-    if (!title) {
-
-        if (message) {
-            message.textContent =
-                "Please enter a task title.";
-        }
-
-        return;
-    }
-
-
-    const task =
-        createAssignedTask(
-            userId,
-            {
-                text: title,
-                description,
-                category,
-                priority,
-                dueDate,
-                projectId,
-                status: "To Do"
-            }
-        );
-
-
-    if (!task) {
-
-        if (message) {
-            message.textContent =
-                "Could not assign task.";
-        }
-
-        return;
-    }
-
-
-    if (message) {
-
-        message.textContent =
-            "Task assigned successfully.";
-    }
-
-
-    const form =
-        $("#adminAssignTaskForm");
-
-    if (form) {
-        form.reset();
-    }
-
-
-    loadAdminDashboard();
-}
-
-
-/* =========================================================
-   ADMIN BOARD
-========================================================= */
-
-function renderAdminBoard() {
-
-    const users =
-        getAllRegularUsers();
-
-    const allTasks = [];
-
-    users.forEach(user => {
-
-        const userTasks =
-            loadTasks(user.id);
-
-        userTasks.forEach(task => {
-
-            allTasks.push({
-                ...task,
-                assignedUserName:
-                    user.name
-            });
-        });
-    });
-
-
-    const columns = {
-        "To Do": $("#adminTodoColumn"),
-        "In Progress": $("#adminInProgressColumn"),
-        "In Review": $("#adminInReviewColumn"),
-        "Done": $("#adminDoneColumn")
-    };
-
-
-    Object.values(columns).forEach(
-        column => {
-
-            if (column) {
-                column.innerHTML = "";
-            }
-        }
-    );
-
-
-    const counts = {
-        "To Do": 0,
-        "In Progress": 0,
-        "In Review": 0,
-        "Done": 0
-    };
-
-
-    allTasks.forEach(task => {
-
-        const column =
-            columns[task.status];
-
-        if (!column) {
             return;
         }
 
-        counts[task.status]++;
+        tasks =
+            loadTasks(
+                currentUser.id
+            );
 
+        projects =
+            ensureDefaultProject(
+                currentUser.id
+            );
 
-        const card =
-            document.createElement("div");
+        if (
+            !projects.some(
+                project =>
+                    project.id ===
+                    activeProjectId
+            )
+        ) {
+            activeProjectId =
+                projects[0]?.id || "";
+        }
 
-        card.className =
-            "board-task";
+        renderUserDashboard();
 
+        alert(
+            "Tasks imported successfully."
+        );
 
-        card.innerHTML = `
+    } catch (error) {
 
-            <div class="board-task-title">
-                ${escapeHTML(task.text)}
-            </div>
+        alert(
+            "Invalid JSON file."
+        );
 
-            <div class="board-task-meta">
+    } finally {
 
-                <span>
-                    ${escapeHTML(
-                        task.assignedUserName
-                    )}
-                </span>
-
-                <span>
-                    ${escapeHTML(
-                        task.priority || "Normal"
-                    )}
-                </span>
-
-            </div>
-        `;
-
-
-        column.appendChild(card);
-    });
-
-
-    const todoCount =
-        $("#adminTodoTasks");
-
-    const inProgressCount =
-        $("#adminInProgressTasks");
-
-    const inReviewCount =
-        $("#adminInReviewTasks");
-
-    const doneCount =
-        $("#adminDoneTasks");
-
-
-    if (todoCount) {
-        todoCount.textContent =
-            counts["To Do"];
-    }
-
-    if (inProgressCount) {
-        inProgressCount.textContent =
-            counts["In Progress"];
-    }
-
-    if (inReviewCount) {
-        inReviewCount.textContent =
-            counts["In Review"];
-    }
-
-    if (doneCount) {
-        doneCount.textContent =
-            counts["Done"];
+        event.target.value = "";
     }
 }
 
 
-/* =========================================================
-   EVENT LISTENERS
-========================================================= */
-
-function setupEventListeners() {
-
-
-    /* Auth */
-
-    loginForm?.addEventListener(
-        "submit",
-        handleLogin
-    );
-
-    registerForm?.addEventListener(
-        "submit",
-        handleRegister
-    );
-
-    showRegisterBtn?.addEventListener(
-        "click",
-        showRegister
-    );
-
-    showLoginBtn?.addEventListener(
-        "click",
-        showLogin
-    );
-
-    logoutBtn?.addEventListener(
-        "click",
-        handleLogout
-    );
-
-
-    /* User tasks */
-
-    $("#addTaskBtn")?.addEventListener(
-        "click",
-        handleAddTask
-    );
-
-
-    $("#searchInput")?.addEventListener(
-        "input",
-        handleSearch
-    );
-
-
-    $("#sortSelect")?.addEventListener(
-        "change",
-        handleSort
-    );
-
-
-    $("#listViewBtn")?.addEventListener(
-        "click",
-        () =>
-            setView("list")
-    );
-
-
-    $("#boardViewBtn")?.addEventListener(
-        "click",
-        () =>
-            setView("board")
-    );
-
-
-    /* Category */
-
-    document.addEventListener(
-        "click",
-        event => {
-
-            const categoryButton =
-                event.target.closest(
-                    "[data-category]"
-                );
-
-            if (categoryButton) {
-                handleCategoryFilter(event);
-            }
-        }
-    );
-
-
-    /* Projects */
-
-    $("#projectSwitcher")?.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target.closest(
-                    "#newProjectBtn"
-                )
-            ) {
-
-                openNewProjectDialog();
-
-                return;
-            }
-
-            handleProjectClick(event);
-        }
-    );
-
-
-    $("#closeNewProjectBtn")?.addEventListener(
-        "click",
-        closeNewProjectDialog
-    );
-
-
-    $("#cancelProjectBtn")?.addEventListener(
-        "click",
-        closeNewProjectDialog
-    );
-
-
-    $("#createProjectBtn")?.addEventListener(
-        "click",
-        handleCreateProject
-    );
-
-
-    /* Task list */
-
-    $("#taskList")?.addEventListener(
-        "click",
-        event => {
-
-            const openButton =
-                event.target.closest(
-                    ".view-task-btn"
-                );
-
-            if (openButton) {
-
-                openTaskDetail(
-                    openButton.dataset.taskId
-                );
-
-                return;
-            }
-
-            handleTaskDelete(event);
-        }
-    );
-
-
-    /* Board */
-
-    $("#kanbanBoard")?.addEventListener(
-        "dragover",
-        handleBoardDragOver
-    );
-
-    $("#kanbanBoard")?.addEventListener(
-        "drop",
-        handleBoardDrop
-    );
-
-
-    $("#kanbanBoard")?.addEventListener(
-        "dragstart",
-        handleDragStart
-    );
-
-
-    /* List drag */
-
-    $("#taskList")?.addEventListener(
-        "dragstart",
-        handleListDragStart
-    );
-
-    $("#taskList")?.addEventListener(
-        "dragover",
-        handleListDragOver
-    );
-
-    $("#taskList")?.addEventListener(
-        "drop",
-        handleListDrop
-    );
-
-
-    /* Task detail */
-
-    $("#closeTaskDetailBtn")?.addEventListener(
-        "click",
-        closeTaskDetail
-    );
-
-
-    $("#closeTaskDetailBtnBottom")?.addEventListener(
-        "click",
-        closeTaskDetail
-    );
-
-
-    $("#saveNotesBtn")?.addEventListener(
-        "click",
-        saveTaskDetail
-    );
-
-
-    $("#addSubtaskBtn")?.addEventListener(
-        "click",
-        handleAddSubtask
-    );
-
-
-    $("#subtaskList")?.addEventListener(
-        "click",
-        handleSubtaskClick
-    );
-
-
-    /* Undo */
-
-    $("#undoBtn")?.addEventListener(
-        "click",
-        handleUndo
-    );
-
-
-    /* Import / Export */
-
-    $("#exportBtn")?.addEventListener(
-        "click",
-        handleExport
-    );
-
-
-    $("#importFileInput")?.addEventListener(
-        "change",
-        handleImport
-    );
-
-
-    /* Admin */
-
-    $("#adminAssignTaskForm")?.addEventListener(
-        "submit",
-        handleAdminAssignTask
-    );
-
-
-    $("#refreshAdminReportsBtn")?.addEventListener(
-        "click",
-        loadAdminDashboard
-    );
-
-
-    $("#adminOpenTaskManagerBtn")?.addEventListener(
-        "click",
-        () => {
-
-            hide(adminDashboard);
-            show(userTaskManager);
-
-            loadUserDashboard();
-        }
-    );
-}
-
-
-/* =========================================================
-   KEYBOARD SHORTCUTS
-========================================================= */
-
-function setupKeyboardShortcuts() {
+// ========================================
+// KEYBOARD SHORTCUTS
+// ========================================
+
+function attachKeyboardEvents() {
 
     document.addEventListener(
         "keydown",
         event => {
 
-            const target =
-                event.target;
+            const active =
+                document.activeElement;
 
             const isTyping =
-                target instanceof HTMLInputElement ||
-                target instanceof HTMLTextAreaElement ||
-                target instanceof HTMLSelectElement;
+                active &&
+                (
+                    active.tagName === "INPUT" ||
+                    active.tagName === "TEXTAREA" ||
+                    active.tagName === "SELECT"
+                );
 
-
-            /* N = focus task input */
-
+            // N = focus task input
             if (
                 event.key.toLowerCase() === "n" &&
                 !isTyping &&
-                !isAdmin(currentUser)
+                !appScreen.hidden &&
+                !userTaskManager.hidden
             ) {
 
                 event.preventDefault();
 
-                $("#taskInput")?.focus();
+                $("taskInput")?.focus();
 
                 return;
             }
 
-
-            /* Escape = clear search */
-
+            // Escape = clear search
             if (
                 event.key === "Escape" &&
-                target === $("#searchInput")
+                !isTyping
             ) {
 
                 if (
-                    $("#searchInput").value
+                    searchText &&
+                    $("searchInput")
                 ) {
-
-                    $("#searchInput").value =
-                        "";
 
                     searchText = "";
 
-                    renderFilteredTasks();
+                    $("searchInput").value = "";
+
+                    renderUserDashboard();
                 }
             }
         }
@@ -2431,39 +1799,396 @@ function setupKeyboardShortcuts() {
 }
 
 
-/* =========================================================
-   INITIALIZE
-========================================================= */
+// ========================================
+// ADMIN EVENTS
+// ========================================
 
-function init() {
+function attachAdminEvents() {
 
-    setupEventListeners();
+    $("adminAssignTaskForm")
+        ?.addEventListener(
+            "submit",
+            handleAdminAssignTask
+        );
 
-    setupKeyboardShortcuts();
+    $("refreshAdminReportsBtn")
+        ?.addEventListener(
+            "click",
+            loadAdminDashboard
+        );
 
-    currentUser =
-        getCurrentUser();
+    $("adminOpenTaskManagerBtn")
+        ?.addEventListener(
+            "click",
+            () => {
 
+                $("adminDashboard")
+                    ?.scrollIntoView({
+                        behavior: "smooth"
+                    });
+            }
+        );
 
-    if (currentUser) {
+    $("adminUserSelect")
+        ?.addEventListener(
+            "change",
+            () => {
 
-        openApplication();
+                $("adminAssignMessage")
+                    .textContent = "";
+            }
+        );
 
-    } else {
-
-        show(authScreen);
-        hide(appScreen);
-
-        showLogin();
-    }
+    attachAdminDragAndDrop();
 }
 
 
-/* =========================================================
-   START APP
-========================================================= */
+// ========================================
+// ADMIN DASHBOARD
+// ========================================
 
-document.addEventListener(
-    "DOMContentLoaded",
-    init
-);
+function loadAdminDashboard() {
+
+    if (!currentUser || !isAdmin(currentUser)) {
+        return;
+    }
+
+    const users =
+        loadUsers();
+
+    const regularUsers =
+        users.filter(
+            user =>
+                user.role !== "admin"
+        );
+
+    const allTasks = [];
+
+    const userStats = [];
+
+    regularUsers.forEach(user => {
+
+        const userTasks =
+            loadTasks(user.id);
+
+        allTasks.push(
+            ...userTasks.map(task => ({
+                ...task,
+                assignedTo: user.id,
+                assignedToName: user.name
+            }))
+        );
+
+        const total =
+            userTasks.length;
+
+        const completed =
+            userTasks.filter(
+                task =>
+                    task.status === "Done" ||
+                    task.completed === true
+            ).length;
+
+        const pending =
+            total - completed;
+
+        const progress =
+            total
+                ? Math.round(
+                    (completed / total) * 100
+                )
+                : 0;
+
+        userStats.push({
+            user,
+            total,
+            completed,
+            pending,
+            progress
+        });
+    });
+
+    renderAdminSummary(
+        {
+            totalUsers:
+                $("adminTotalUsers"),
+
+            totalTasks:
+                $("adminTotalTasks"),
+
+            pendingTasks:
+                $("adminPendingTasks"),
+
+            completedTasks:
+                $("adminCompletedTasks")
+        },
+        regularUsers,
+        allTasks
+    );
+
+    renderAdminUsers(
+        $("adminUsersList"),
+        userStats
+    );
+
+    renderAdminReports(
+        $("adminReportsList"),
+        userStats
+    );
+
+    renderUserSelect(
+        $("adminUserSelect"),
+        regularUsers
+    );
+
+    renderAdminBoard(
+        allTasks,
+        regularUsers,
+        {
+            todo:
+                $("adminTodoColumn"),
+
+            inProgress:
+                $("adminInProgressColumn"),
+
+            inReview:
+                $("adminInReviewColumn"),
+
+            done:
+                $("adminDoneColumn"),
+
+            todoCount:
+                $("adminTodoTasks"),
+
+            inProgressCount:
+                $("adminInProgressTasks"),
+
+            inReviewCount:
+                $("adminInReviewTasks"),
+
+            doneCount:
+                $("adminDoneTasks")
+        }
+    );
+}
+
+
+// ========================================
+// ADMIN ASSIGN TASK
+// ========================================
+
+function handleAdminAssignTask(event) {
+
+    event.preventDefault();
+
+    const userId =
+        $("adminUserSelect").value;
+
+    const title =
+        $("adminTaskTitle")
+            .value
+            .trim();
+
+    const description =
+        $("adminTaskDescription")
+            .value
+            .trim();
+
+    const category =
+        $("adminTaskCategory").value ||
+        "Personal";
+
+    const priority =
+        $("adminTaskPriority").value ||
+        "Medium";
+
+    const dueDate =
+        $("adminTaskDueDate").value ||
+        "";
+
+    const projectId =
+        $("adminTaskProject").value ||
+        "";
+
+    const message =
+        $("adminAssignMessage");
+
+    message.textContent = "";
+
+    if (!userId) {
+
+        message.textContent =
+            "Please select a user.";
+
+        return;
+    }
+
+    if (!title) {
+
+        message.textContent =
+            "Please enter task title.";
+
+        return;
+    }
+
+    const task =
+        createAssignedTask(
+            userId,
+            {
+                title,
+                description,
+                category,
+                priority,
+                dueDate,
+                projectId,
+                status: "To Do"
+            },
+            currentUser.id
+        );
+
+    if (!task) {
+
+        message.textContent =
+            "Task could not be assigned.";
+
+        return;
+    }
+
+    message.textContent =
+        "Task assigned successfully.";
+
+    $("adminTaskTitle").value = "";
+    $("adminTaskDescription").value = "";
+    $("adminTaskDueDate").value = "";
+
+    loadAdminDashboard();
+}
+
+
+// ========================================
+// ADMIN DRAG AND DROP
+// ========================================
+
+function attachAdminDragAndDrop() {
+
+    document.addEventListener(
+        "dragover",
+        event => {
+
+            const column =
+                event.target.closest(
+                    ".admin-board-column"
+                );
+
+            if (!column) return;
+
+            event.preventDefault();
+        }
+    );
+
+    document.addEventListener(
+        "drop",
+        event => {
+
+            const column =
+                event.target.closest(
+                    ".admin-board-column"
+                );
+
+            if (!column) return;
+
+            event.preventDefault();
+
+            const taskId =
+                event.dataTransfer.getData(
+                    "text/plain"
+                );
+
+            if (!taskId) return;
+
+            const newStatus =
+                getStatusFromColumn(
+                    column
+                );
+
+            if (!newStatus) return;
+
+            updateAdminTaskStatus(
+                taskId,
+                newStatus
+            );
+        }
+    );
+}
+
+
+// ========================================
+// UPDATE ADMIN TASK STATUS
+// ========================================
+
+function updateAdminTaskStatus(
+    taskId,
+    newStatus
+) {
+
+    const users =
+        loadUsers();
+
+    for (const user of users) {
+
+        if (user.role === "admin") {
+            continue;
+        }
+
+        const userTasks =
+            loadTasks(user.id);
+
+        const task =
+            userTasks.find(
+                item =>
+                    item.id === taskId
+            );
+
+        if (!task) continue;
+
+        task.status =
+            newStatus;
+
+        task.completed =
+            newStatus === "Done";
+
+        task.updatedAt =
+            new Date().toISOString();
+
+        saveTasks(
+            user.id,
+            userTasks
+        );
+
+        break;
+    }
+
+    loadAdminDashboard();
+}
+
+
+// ========================================
+// CREATE ID
+// ========================================
+
+function createId() {
+
+    if (
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+    ) {
+        return crypto.randomUUID();
+    }
+
+    return (
+        Date.now().toString(36) +
+        Math.random()
+            .toString(36)
+            .slice(2)
+    );
+}
