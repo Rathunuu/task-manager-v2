@@ -3,33 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Task Manager V2</title>
-
     <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
 
-    <!-- ==========================================
+    <!-- ================================
          AUTH SCREEN
-    =========================================== -->
+    ================================= -->
 
     <main id="authScreen" class="auth-screen">
 
         <section class="auth-card">
 
-            <div class="auth-logo">
-                TM
-            </div>
+            <div class="auth-logo">TM</div>
 
             <!-- LOGIN -->
 
             <div id="loginSection">
 
-                <span class="eyebrow">
-                    Task Manager V2
-                </span>
+                <span class="eyebrow">Task Manager V2</span>
 
                 <h1>Welcome Back</h1>
 
@@ -80,9 +74,7 @@
 
                 <div class="auth-switch">
 
-                    <span>
-                        Don't have an account?
-                    </span>
+                    <span>Don't have an account?</span>
 
                     <button
                         type="button"
@@ -96,17 +88,11 @@
 
                 <div class="admin-login-hint">
 
-                    <strong>
-                        Master Admin
-                    </strong>
+                    <strong>Master Admin</strong>
 
-                    <span>
-                        Email: admin@taskmanager.com
-                    </span>
+                    <span>Email: admin@taskmanager.com</span>
 
-                    <span>
-                        Password: admin123
-                    </span>
+                    <span>Password: admin123</span>
 
                 </div>
 
@@ -120,9 +106,7 @@
                 class="hidden"
             >
 
-                <span class="eyebrow">
-                    Task Manager V2
-                </span>
+                <span class="eyebrow">Task Manager V2</span>
 
                 <h1>Create Account</h1>
 
@@ -197,9 +181,7 @@
 
                 <div class="auth-switch">
 
-                    <span>
-                        Already have an account?
-                    </span>
+                    <span>Already have an account?</span>
 
                     <button
                         type="button"
@@ -218,9 +200,9 @@
     </main>
 
 
-    <!-- ==========================================
+    <!-- ================================
          APPLICATION
-    =========================================== -->
+    ================================= -->
 
     <main
         id="appScreen"
@@ -233,15 +215,11 @@
 
             <div class="header-left">
 
-                <div class="brand-mark">
-                    TM
-                </div>
+                <div class="brand-mark">TM</div>
 
                 <div>
 
-                    <h1>
-                        Task Manager
-                    </h1>
+                    <h1>Task Manager</h1>
 
                     <p id="welcomeMessage">
                         Welcome
@@ -273,15 +251,13 @@
         </header>
 
 
-        <!-- ==========================================
-             MAIN DASHBOARD
-        =========================================== -->
+        <!-- MAIN DASHBOARD -->
 
         <section class="dashboard">
 
-            <!-- ======================================
+            <!-- ================================
                  ADMIN DASHBOARD
-            ======================================= -->
+            ================================= -->
 
             <section
                 id="adminDashboard"
@@ -294,9 +270,7 @@
                         Master Admin
                     </span>
 
-                    <h2>
-                        Admin Dashboard
-                    </h2>
+                    <h2>Admin Dashboard</h2>
 
                     <p>
                         Manage users, assign tasks and track progress.
@@ -315,9 +289,7 @@
                             Total Users
                         </span>
 
-                        <strong id="adminTotalUsers">
-                            0
-                        </strong>
+                        <strong id="adminTotalUsers">0</strong>
 
                     </article>
 
@@ -327,9 +299,7 @@
                             Total Tasks
                         </span>
 
-                        <strong id="adminTotalTasks">
-                            0
-                        </strong>
+                        <strong id="adminTotalTasks">0</strong>
 
                     </article>
 
@@ -339,9 +309,7 @@
                             Pending Tasks
                         </span>
 
-                        <strong id="adminPendingTasks">
-                            0
-                        </strong>
+                        <strong id="adminPendingTasks">0</strong>
 
                     </article>
 
@@ -351,18 +319,14 @@
                             Completed Tasks
                         </span>
 
-                        <strong id="adminCompletedTasks">
-                            0
-                        </strong>
+                        <strong id="adminCompletedTasks">0</strong>
 
                     </article>
 
                 </div>
 
 
-                <!-- ==================================
-                     REGISTERED USERS
-                =================================== -->
+                <!-- REGISTERED USERS -->
 
                 <section class="admin-section">
 
@@ -370,9 +334,7 @@
 
                         <div>
 
-                            <h3>
-                                Registered Users
-                            </h3>
+                            <h3>Registered Users</h3>
 
                             <p>
                                 View user task progress.
@@ -390,9 +352,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     ASSIGN TASK
-                =================================== -->
+                <!-- ASSIGN TASK -->
 
                 <section class="admin-section">
 
@@ -400,9 +360,7 @@
 
                         <div>
 
-                            <h3>
-                                Assign Task
-                            </h3>
+                            <h3>Assign Task</h3>
 
                             <p>
                                 Create a task and assign it to a specific user.
@@ -581,9 +539,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     ADMIN TASK BOARD
-                =================================== -->
+                <!-- ADMIN TASK BOARD -->
 
                 <section class="admin-section">
 
@@ -591,9 +547,7 @@
 
                         <div>
 
-                            <h3>
-                                All User Tasks
-                            </h3>
+                            <h3>All User Tasks</h3>
 
                             <p>
                                 Track and update task status.
@@ -612,9 +566,7 @@
                                 To Do
                             </span>
 
-                            <strong id="adminTodoTasks">
-                                0
-                            </strong>
+                            <strong id="adminTodoTasks">0</strong>
 
                         </article>
 
@@ -624,9 +576,7 @@
                                 In Progress
                             </span>
 
-                            <strong id="adminInProgressTasks">
-                                0
-                            </strong>
+                            <strong id="adminInProgressTasks">0</strong>
 
                         </article>
 
@@ -636,9 +586,7 @@
                                 In Review
                             </span>
 
-                            <strong id="adminInReviewTasks">
-                                0
-                            </strong>
+                            <strong id="adminInReviewTasks">0</strong>
 
                         </article>
 
@@ -648,9 +596,7 @@
                                 Done
                             </span>
 
-                            <strong id="adminDoneTasks">
-                                0
-                            </strong>
+                            <strong id="adminDoneTasks">0</strong>
 
                         </article>
 
@@ -673,9 +619,7 @@
 
                                     <span class="status-dot todo-dot"></span>
 
-                                    <h4>
-                                        To Do
-                                    </h4>
+                                    <h4>To Do</h4>
 
                                 </div>
 
@@ -704,9 +648,7 @@
 
                                     <span class="status-dot progress-dot"></span>
 
-                                    <h4>
-                                        In Progress
-                                    </h4>
+                                    <h4>In Progress</h4>
 
                                 </div>
 
@@ -735,9 +677,7 @@
 
                                     <span class="status-dot review-dot"></span>
 
-                                    <h4>
-                                        In Review
-                                    </h4>
+                                    <h4>In Review</h4>
 
                                 </div>
 
@@ -766,9 +706,7 @@
 
                                     <span class="status-dot done-dot"></span>
 
-                                    <h4>
-                                        Done
-                                    </h4>
+                                    <h4>Done</h4>
 
                                 </div>
 
@@ -787,9 +725,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     USER REPORTS
-                =================================== -->
+                <!-- USER REPORTS -->
 
                 <section class="admin-section">
 
@@ -842,14 +778,16 @@
             </section>
 
 
-            <!-- ======================================
+            <!-- ================================
                  USER TASK MANAGER
-            ======================================= -->
+            ================================= -->
 
             <section
                 id="userTaskManager"
                 class="hidden"
             >
+
+                <!-- PROJECT HEADER -->
 
                 <div class="project-header">
 
@@ -931,9 +869,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     ADD TASK
-                =================================== -->
+                <!-- ADD TASK -->
 
                 <section class="task-create-section">
 
@@ -952,6 +888,7 @@
                         </div>
 
                     </div>
+
 
                     <div class="add-task-form">
 
@@ -1038,9 +975,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     TASK CONTROLS
-                =================================== -->
+                <!-- TASK CONTROLS -->
 
                 <section class="task-controls">
 
@@ -1065,9 +1000,7 @@
                         aria-label="Task category filters"
                     >
 
-                        <span>
-                            Filter:
-                        </span>
+                        <span>Filter:</span>
 
                         <button
                             type="button"
@@ -1164,9 +1097,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     LIST VIEW
-                =================================== -->
+                <!-- LIST VIEW -->
 
                 <section id="taskListView">
 
@@ -1197,9 +1128,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     KANBAN VIEW
-                =================================== -->
+                <!-- KANBAN BOARD -->
 
                 <section
                     id="kanbanBoard"
@@ -1219,9 +1148,7 @@
 
                                 <span class="status-dot todo-dot"></span>
 
-                                <h4>
-                                    To Do
-                                </h4>
+                                <h4>To Do</h4>
 
                             </div>
 
@@ -1249,9 +1176,7 @@
 
                                 <span class="status-dot progress-dot"></span>
 
-                                <h4>
-                                    In Progress
-                                </h4>
+                                <h4>In Progress</h4>
 
                             </div>
 
@@ -1279,9 +1204,7 @@
 
                                 <span class="status-dot review-dot"></span>
 
-                                <h4>
-                                    In Review
-                                </h4>
+                                <h4>In Review</h4>
 
                             </div>
 
@@ -1309,9 +1232,7 @@
 
                                 <span class="status-dot done-dot"></span>
 
-                                <h4>
-                                    Done
-                                </h4>
+                                <h4>Done</h4>
 
                             </div>
 
@@ -1328,9 +1249,7 @@
                 </section>
 
 
-                <!-- ==================================
-                     DATA ACTIONS
-                =================================== -->
+                <!-- DATA ACTIONS -->
 
                 <section class="data-actions">
 
@@ -1341,7 +1260,6 @@
                     >
                         Export Tasks
                     </button>
-
 
                     <label
                         for="importFileInput"
@@ -1366,9 +1284,9 @@
     </main>
 
 
-    <!-- ==========================================
+    <!-- ================================
          TASK DETAIL DIALOG
-    =========================================== -->
+    ================================= -->
 
     <dialog
         id="taskDetailDialog"
@@ -1422,9 +1340,7 @@
 
                 <div>
 
-                    <span>
-                        Status
-                    </span>
+                    <span>Status</span>
 
                     <strong id="detailStatus">
                         To Do
@@ -1434,9 +1350,7 @@
 
                 <div>
 
-                    <span>
-                        Priority
-                    </span>
+                    <span>Priority</span>
 
                     <strong id="detailPriority">
                         Medium
@@ -1446,9 +1360,7 @@
 
                 <div>
 
-                    <span>
-                        Due Date
-                    </span>
+                    <span>Due Date</span>
 
                     <strong id="detailDueDate">
                         —
@@ -1458,9 +1370,7 @@
 
                 <div>
 
-                    <span>
-                        Category
-                    </span>
+                    <span>Category</span>
 
                     <strong id="detailCategory">
                         Work
@@ -1496,9 +1406,7 @@
 
                     <div>
 
-                        <h3>
-                            Subtasks
-                        </h3>
+                        <h3>Subtasks</h3>
 
                         <p>
                             Break this task into smaller steps.
@@ -1562,9 +1470,9 @@
     </dialog>
 
 
-    <!-- ==========================================
+    <!-- ================================
          NEW PROJECT DIALOG
-    =========================================== -->
+    ================================= -->
 
     <dialog
         id="newProjectDialog"
@@ -1646,9 +1554,9 @@
     </dialog>
 
 
-    <!-- ==========================================
+    <!-- ================================
          UNDO TOAST
-    =========================================== -->
+    ================================= -->
 
     <div
         id="undoToast"
@@ -1672,9 +1580,7 @@
     </div>
 
 
-    <!-- ==========================================
-         JAVASCRIPT
-    =========================================== -->
+    <!-- JAVASCRIPT -->
 
     <script
         type="module"
