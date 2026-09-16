@@ -1,10 +1,14 @@
 // ========================================
 // RENDER.JS
 // Task Manager V2
-// Week 2 + Week 3 + Admin
+// Week 2 + Week 3 + Master Admin
 // ========================================
 
-// ---------- SECURITY ----------
+
+// ========================================
+// SECURITY
+// ========================================
+
 export function escapeHTML(value = "") {
     return String(value)
         .replace(/&/g, "&amp;")
@@ -15,15 +19,60 @@ export function escapeHTML(value = "") {
 }
 
 
-// ---------- HELPERS ----------
+// ========================================
+// STATUS HELPERS
+// ========================================
+
+export function normalizeStatus(status = "To Do") {
+
+    const value =
+        String(status)
+            .trim()
+            .toLowerCase();
+
+    if (
+        value === "todo" ||
+        value === "to-do" ||
+        value === "to do"
+    ) {
+        return "To Do";
+    }
+
+    if (
+        value === "in-progress" ||
+        value === "in progress"
+    ) {
+        return "In Progress";
+    }
+
+    if (
+        value === "in-review" ||
+        value === "in review"
+    ) {
+        return "In Review";
+    }
+
+    if (value === "done") {
+        return "Done";
+    }
+
+    return "To Do";
+}
+
+
 export function getStatusClass(status = "To Do") {
-    return status
+
+    return normalizeStatus(status)
         .toLowerCase()
         .replace(/\s+/g, "-");
 }
 
+
 export function formatDate(date) {
-    if (!date) return "No due date";
+
+    if (!date) {
+        return "No due date";
+    }
 
     const d = new Date(date);
 
@@ -38,14 +87,22 @@ export function formatDate(date) {
     });
 }
 
+
 export function getProgress(tasks = []) {
-    if (!tasks.length) return 0;
 
-    const completed = tasks.filter(task =>
-        task.status === "Done" || task.completed === true
-    ).length;
+    if (!tasks.length) {
+        return 0;
+    }
 
-    return Math.round((completed / tasks.length) * 100);
+    const completed =
+        tasks.filter(task =>
+            normalizeStatus(task.status) === "Done" ||
+            task.completed === true
+        ).length;
+
+    return Math.round(
+        (completed / tasks.length) * 100
+    );
 }
 
 
@@ -58,33 +115,46 @@ export function renderProjects(
     projects = [],
     activeProjectId = ""
 ) {
+
     if (!container) return;
 
     container.innerHTML = "";
 
     if (!projects.length) {
+
         container.innerHTML = `
             <div class="project-empty">
                 No projects yet.
             </div>
         `;
+
         return;
     }
 
     projects.forEach(project => {
-        const button = document.createElement("button");
+
+        const button =
+            document.createElement("button");
+
+        button.type = "button";
 
         button.className =
             `project-item ${
-                project.id === activeProjectId ? "active" : ""
+                project.id === activeProjectId
+                    ? "active"
+                    : ""
             }`;
 
-        button.dataset.projectId = project.id;
+        button.dataset.projectId =
+            project.id;
 
         button.innerHTML = `
             <span class="project-icon">📁</span>
+
             <span class="project-name">
-                ${escapeHTML(project.name)}
+                ${escapeHTML(
+                    project.name || "Unnamed Project"
+                )}
             </span>
         `;
 
@@ -103,22 +173,32 @@ export function renderProgress(
     progressPercentage,
     tasks = []
 ) {
-    const percentage = getProgress(tasks);
+
+    const percentage =
+        getProgress(tasks);
+
+    const completed =
+        tasks.filter(task =>
+            normalizeStatus(task.status) === "Done" ||
+            task.completed === true
+        ).length;
 
     if (progressText) {
+
         progressText.textContent =
-            `${tasks.filter(task =>
-                task.status === "Done" ||
-                task.completed === true
-            ).length} of ${tasks.length} tasks done`;
+            `${completed} of ${tasks.length} tasks done`;
     }
 
     if (progressFill) {
-        progressFill.style.width = `${percentage}%`;
+
+        progressFill.style.width =
+            `${percentage}%`;
     }
 
     if (progressPercentage) {
-        progressPercentage.textContent = `${percentage}%`;
+
+        progressPercentage.textContent =
+            `${percentage}%`;
     }
 }
 
@@ -128,30 +208,51 @@ export function renderProgress(
 // ========================================
 
 function createTaskCard(task) {
-    const card = document.createElement("article");
 
-    card.className = "task-card";
+    const card =
+        document.createElement("article");
+
+    card.className =
+        "task-card";
+
     card.draggable = true;
 
-    card.dataset.taskId = task.id;
+    card.dataset.taskId =
+        task.id;
 
-    const status = task.status || "To Do";
-    const category = task.category || "Personal";
-    const priority = task.priority || "Medium";
+
+    const status =
+        normalizeStatus(task.status);
+
+    const category =
+        task.category || "Personal";
+
+    const priority =
+        task.priority || "Medium";
+
 
     card.innerHTML = `
+
         <div class="task-card-top">
 
             <div class="task-title-wrap">
+
                 <h3 class="task-title">
-                    ${escapeHTML(task.title || "Untitled Task")}
+                    ${escapeHTML(
+                        task.title ||
+                        "Untitled Task"
+                    )}
                 </h3>
+
             </div>
 
+
             <button
-                class="task-delete-btn"
+                class="task-delete-btn delete-task-btn"
                 type="button"
-                data-delete-task="${escapeHTML(task.id)}"
+                data-delete-task="${escapeHTML(
+                    task.id
+                )}"
                 title="Delete task"
             >
                 ×
@@ -159,42 +260,63 @@ function createTaskCard(task) {
 
         </div>
 
+
         ${
             task.description
                 ? `
                     <p class="task-description">
-                        ${escapeHTML(task.description)}
+                        ${escapeHTML(
+                            task.description
+                        )}
                     </p>
                 `
                 : ""
         }
 
+
         <div class="task-meta">
 
-            <span class="task-category category-${getStatusClass(category)}">
+            <span
+                class="task-badge task-category
+                category-${getStatusClass(category)}"
+            >
                 ${escapeHTML(category)}
             </span>
 
-            <span class="task-priority priority-${getStatusClass(priority)}">
+
+            <span
+                class="task-badge task-priority
+                priority-${getStatusClass(priority)}"
+            >
                 ${escapeHTML(priority)}
             </span>
 
-            <span class="task-status status-${getStatusClass(status)}">
+
+            <span
+                class="task-badge task-status
+                status-${getStatusClass(status)}"
+            >
                 ${escapeHTML(status)}
             </span>
 
         </div>
 
+
         <div class="task-card-bottom">
 
             <span class="task-due-date">
-                📅 ${escapeHTML(formatDate(task.dueDate))}
+                📅 ${escapeHTML(
+                    formatDate(task.dueDate)
+                )}
             </span>
 
+
             <button
-                class="task-open-btn"
+                class="task-open-btn task-action-btn"
                 type="button"
-                data-open-task="${escapeHTML(task.id)}"
+                data-open-task="${escapeHTML(
+                    task.id
+                )}"
             >
                 View
             </button>
@@ -214,6 +336,7 @@ export function renderTasks(
     container,
     tasks = []
 ) {
+
     if (!container) return;
 
     container.innerHTML = "";
@@ -223,6 +346,7 @@ export function renderTasks(
     }
 
     tasks.forEach(task => {
+
         container.appendChild(
             createTaskCard(task)
         );
@@ -238,9 +362,11 @@ export function renderEmptyState(
     emptyState,
     hasTasks
 ) {
+
     if (!emptyState) return;
 
-    emptyState.hidden = hasTasks;
+    emptyState.hidden =
+        hasTasks;
 }
 
 
@@ -252,15 +378,19 @@ export function renderBoard(
     tasks = [],
     columns = {}
 ) {
-    const todoColumn = columns.todo;
-    const inProgressColumn = columns.inProgress;
-    const inReviewColumn = columns.inReview;
-    const doneColumn = columns.done;
 
-    const todoCount = columns.todoCount;
-    const inProgressCount = columns.inProgressCount;
-    const inReviewCount = columns.inReviewCount;
-    const doneCount = columns.doneCount;
+    const todoColumn =
+        columns.todo;
+
+    const inProgressColumn =
+        columns.inProgress;
+
+    const inReviewColumn =
+        columns.inReview;
+
+    const doneColumn =
+        columns.done;
+
 
     const allColumns = [
         todoColumn,
@@ -269,78 +399,94 @@ export function renderBoard(
         doneColumn
     ];
 
+
     allColumns.forEach(column => {
+
         if (column) {
             column.innerHTML = "";
         }
     });
 
+
     const grouped = {
+
         "To Do": [],
+
         "In Progress": [],
+
         "In Review": [],
+
         "Done": []
     };
 
-    tasks.forEach(task => {
-        const status = task.status || "To Do";
 
-        if (!grouped[status]) {
-            grouped["To Do"].push(task);
-        } else {
-            grouped[status].push(task);
-        }
+    tasks.forEach(task => {
+
+        const status =
+            normalizeStatus(
+                task.status
+            );
+
+        grouped[status].push(task);
     });
+
 
     grouped["To Do"].forEach(task => {
-        if (todoColumn) {
-            todoColumn.appendChild(
-                createTaskCard(task)
-            );
-        }
+
+        todoColumn?.appendChild(
+            createTaskCard(task)
+        );
     });
+
 
     grouped["In Progress"].forEach(task => {
-        if (inProgressColumn) {
-            inProgressColumn.appendChild(
-                createTaskCard(task)
-            );
-        }
+
+        inProgressColumn?.appendChild(
+            createTaskCard(task)
+        );
     });
+
 
     grouped["In Review"].forEach(task => {
-        if (inReviewColumn) {
-            inReviewColumn.appendChild(
-                createTaskCard(task)
-            );
-        }
+
+        inReviewColumn?.appendChild(
+            createTaskCard(task)
+        );
     });
+
 
     grouped["Done"].forEach(task => {
-        if (doneColumn) {
-            doneColumn.appendChild(
-                createTaskCard(task)
-            );
-        }
+
+        doneColumn?.appendChild(
+            createTaskCard(task)
+        );
     });
 
-    if (todoCount) {
-        todoCount.textContent =
+
+    if (columns.todoCount) {
+
+        columns.todoCount.textContent =
             grouped["To Do"].length;
     }
 
-    if (inProgressCount) {
-        inProgressCount.textContent =
+
+    if (columns.inProgressCount) {
+
+        columns.inProgressCount.textContent =
             grouped["In Progress"].length;
     }
 
-    if (inReviewCount) {
-        inReviewCount.textContent =
+
+    if (columns.inReviewCount) {
+
+        columns.inReviewCount.textContent =
             grouped["In Review"].length;
     }
 
-    if (doneCount) {
-        doneCount.textContent =
+
+    if (columns.doneCount) {
+
+        columns.doneCount.textContent =
             grouped["Done"].length;
     }
 }
@@ -354,7 +500,9 @@ export function renderTaskDetail(
     task,
     elements = {}
 ) {
+
     if (!task) return;
+
 
     const {
         title,
@@ -366,36 +514,55 @@ export function renderTaskDetail(
         notes
     } = elements;
 
+
     if (title) {
-        title.value = task.title || "";
+
+        title.value =
+            task.title || "";
     }
 
+
     if (description) {
+
         description.value =
             task.description || "";
     }
 
+
     if (status) {
+
         status.textContent =
-            task.status || "To Do";
+            normalizeStatus(
+                task.status
+            );
     }
 
+
     if (priority) {
+
         priority.textContent =
             task.priority || "Medium";
     }
 
+
     if (dueDate) {
+
         dueDate.textContent =
-            formatDate(task.dueDate);
+            formatDate(
+                task.dueDate
+            );
     }
 
+
     if (category) {
+
         category.textContent =
             task.category || "Personal";
     }
 
+
     if (notes) {
+
         notes.value =
             task.notes || "";
     }
@@ -410,11 +577,14 @@ export function renderSubtasks(
     container,
     subtasks = []
 ) {
+
     if (!container) return;
 
     container.innerHTML = "";
 
+
     if (!subtasks.length) {
+
         container.innerHTML = `
             <div class="subtask-empty">
                 No subtasks yet.
@@ -424,21 +594,30 @@ export function renderSubtasks(
         return;
     }
 
-    subtasks.forEach(subtask => {
-        const item = document.createElement("div");
 
-        item.className = "subtask-item";
+    subtasks.forEach(subtask => {
+
+        const item =
+            document.createElement("div");
+
+        item.className =
+            "subtask-item";
+
 
         const completed =
             subtask.completed === true ||
             subtask.done === true;
 
+
         item.innerHTML = `
+
             <label class="subtask-label">
 
                 <input
                     type="checkbox"
-                    data-subtask-id="${escapeHTML(subtask.id)}"
+                    data-subtask-id="${escapeHTML(
+                        subtask.id
+                    )}"
                     ${completed ? "checked" : ""}
                 >
 
@@ -456,16 +635,85 @@ export function renderSubtasks(
 
             </label>
 
+
             <button
                 type="button"
                 class="subtask-delete-btn"
-                data-delete-subtask="${escapeHTML(subtask.id)}"
+                data-delete-subtask="${escapeHTML(
+                    subtask.id
+                )}"
             >
                 ×
             </button>
         `;
 
+
         container.appendChild(item);
+    });
+}
+
+
+// ========================================
+// ADMIN USER STATISTICS
+// ========================================
+
+function buildUserStats(
+    users = [],
+    tasks = []
+) {
+
+    return users.map(user => {
+
+        const userTasks =
+            tasks.filter(task =>
+                task.assignedTo === user.id ||
+                task.userId === user.id
+            );
+
+
+        const total =
+            userTasks.length;
+
+
+        const completed =
+            userTasks.filter(task =>
+                normalizeStatus(
+                    task.status
+                ) === "Done" ||
+                task.completed === true
+            ).length;
+
+
+        const pending =
+            total - completed;
+
+
+        const progress =
+            total === 0
+                ? 0
+                : Math.round(
+                    (completed / total) * 100
+                );
+
+
+        return {
+
+            user,
+
+            name:
+                user.name || "Unknown User",
+
+            email:
+                user.email || "",
+
+            total,
+
+            completed,
+
+            pending,
+
+            progress
+        };
     });
 }
 
@@ -479,33 +727,52 @@ export function renderAdminSummary(
     users = [],
     tasks = []
 ) {
-    const totalUsers = users.length;
-    const totalTasks = tasks.length;
 
-    const completedTasks = tasks.filter(task =>
-        task.status === "Done" ||
-        task.completed === true
-    ).length;
+    const totalUsers =
+        users.length;
+
+
+    const totalTasks =
+        tasks.length;
+
+
+    const completedTasks =
+        tasks.filter(task =>
+            normalizeStatus(
+                task.status
+            ) === "Done" ||
+            task.completed === true
+        ).length;
+
 
     const pendingTasks =
-        totalTasks - completedTasks;
+        totalTasks -
+        completedTasks;
 
-    if (elements.totalUsers) {
+
+    if (elements?.totalUsers) {
+
         elements.totalUsers.textContent =
             totalUsers;
     }
 
-    if (elements.totalTasks) {
+
+    if (elements?.totalTasks) {
+
         elements.totalTasks.textContent =
             totalTasks;
     }
 
-    if (elements.pendingTasks) {
+
+    if (elements?.pendingTasks) {
+
         elements.pendingTasks.textContent =
             pendingTasks;
     }
 
-    if (elements.completedTasks) {
+
+    if (elements?.completedTasks) {
+
         elements.completedTasks.textContent =
             completedTasks;
     }
@@ -518,13 +785,25 @@ export function renderAdminSummary(
 
 export function renderAdminUsers(
     container,
-    userStats = []
+    users = [],
+    tasks = []
 ) {
+
     if (!container) return;
+
 
     container.innerHTML = "";
 
+
+    const userStats =
+        buildUserStats(
+            users,
+            tasks
+        );
+
+
     if (!userStats.length) {
+
         container.innerHTML = `
             <div class="admin-empty">
                 No registered users yet.
@@ -534,34 +813,40 @@ export function renderAdminUsers(
         return;
     }
 
-    userStats.forEach(stat => {
-        const card = document.createElement("div");
 
-        card.className = "admin-user-card";
+    userStats.forEach(stat => {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "admin-user-card";
+
 
         const progress =
             Number(stat.progress || 0);
 
+
         card.innerHTML = `
+
             <div class="admin-user-header">
 
-                <div>
-                    <h3>
+                <div class="admin-user-info">
+
+                    <h3 class="admin-user-name">
                         ${escapeHTML(
-                            stat.user?.name ||
-                            stat.name ||
-                            "Unknown User"
+                            stat.name
                         )}
                     </h3>
 
-                    <p>
+                    <p class="admin-user-email">
                         ${escapeHTML(
-                            stat.user?.email ||
-                            stat.email ||
-                            ""
+                            stat.email
                         )}
                     </p>
+
                 </div>
+
 
                 <span class="admin-progress-badge">
                     ${progress}%
@@ -569,38 +854,54 @@ export function renderAdminUsers(
 
             </div>
 
+
             <div class="admin-user-stats">
 
                 <div>
                     <strong>
-                        ${stat.total || 0}
+                        ${stat.total}
                     </strong>
-                    <span>Total</span>
+
+                    <span>
+                        Total
+                    </span>
                 </div>
+
 
                 <div>
                     <strong>
-                        ${stat.completed || 0}
+                        ${stat.completed}
                     </strong>
-                    <span>Done</span>
+
+                    <span>
+                        Done
+                    </span>
                 </div>
+
 
                 <div>
                     <strong>
-                        ${stat.pending || 0}
+                        ${stat.pending}
                     </strong>
-                    <span>Pending</span>
+
+                    <span>
+                        Pending
+                    </span>
                 </div>
 
             </div>
 
+
             <div class="admin-progress-bar">
+
                 <div
                     class="admin-progress-fill"
                     style="width:${progress}%"
                 ></div>
+
             </div>
         `;
+
 
         container.appendChild(card);
     });
@@ -613,13 +914,25 @@ export function renderAdminUsers(
 
 export function renderAdminReports(
     container,
-    userStats = []
+    users = [],
+    tasks = []
 ) {
+
     if (!container) return;
+
 
     container.innerHTML = "";
 
+
+    const userStats =
+        buildUserStats(
+            users,
+            tasks
+        );
+
+
     if (!userStats.length) {
+
         container.innerHTML = `
             <div class="admin-empty">
                 No report data available.
@@ -629,70 +942,87 @@ export function renderAdminReports(
         return;
     }
 
-    const table = document.createElement("div");
 
-    table.className = "reports-table";
+    const table =
+        document.createElement("div");
+
+    table.className =
+        "reports-table";
+
 
     table.innerHTML = `
+
         <div class="reports-row reports-header">
 
             <div>User</div>
+
             <div>Total</div>
+
             <div>Completed</div>
+
             <div>Pending</div>
+
             <div>Progress</div>
 
         </div>
     `;
 
+
     userStats.forEach(stat => {
-        const row = document.createElement("div");
 
-        row.className = "reports-row";
+        const row =
+            document.createElement("div");
 
-        const progress =
-            Number(stat.progress || 0);
+        row.className =
+            "reports-row";
+
 
         row.innerHTML = `
+
             <div>
+
                 <strong>
                     ${escapeHTML(
-                        stat.user?.name ||
-                        stat.name ||
-                        "Unknown"
+                        stat.name
                     )}
                 </strong>
 
                 <small>
                     ${escapeHTML(
-                        stat.user?.email ||
-                        stat.email ||
-                        ""
+                        stat.email
                     )}
                 </small>
+
             </div>
 
-            <div>
-                ${stat.total || 0}
-            </div>
 
             <div>
-                ${stat.completed || 0}
+                ${stat.total}
             </div>
 
+
             <div>
-                ${stat.pending || 0}
+                ${stat.completed}
             </div>
+
+
+            <div>
+                ${stat.pending}
+            </div>
+
 
             <div>
                 <strong>
-                    ${progress}%
+                    ${stat.progress}%
                 </strong>
             </div>
+
         `;
+
 
         table.appendChild(row);
     });
+
 
     container.appendChild(table);
 }
@@ -706,35 +1036,60 @@ export function createAdminTaskCard(
     task,
     user = null
 ) {
-    const card = document.createElement("article");
 
-    card.className = "task-card admin-task-card";
+    const card =
+        document.createElement("article");
+
+
+    card.className =
+        "task-card admin-task-card";
+
 
     card.draggable = true;
 
-    card.dataset.taskId = task.id;
+
+    card.dataset.taskId =
+        task.id;
+
 
     if (user?.id) {
-        card.dataset.userId = user.id;
+
+        card.dataset.userId =
+            user.id;
     }
 
-    const status = task.status || "To Do";
-    const category = task.category || "Personal";
-    const priority = task.priority || "Medium";
+
+    const status =
+        normalizeStatus(
+            task.status
+        );
+
+
+    const category =
+        task.category || "Personal";
+
+
+    const priority =
+        task.priority || "Medium";
+
 
     card.innerHTML = `
+
         <div class="task-card-top">
 
             <div>
+
                 <h3 class="task-title">
                     ${escapeHTML(
                         task.title ||
                         "Untitled Task"
                     )}
                 </h3>
+
             </div>
 
         </div>
+
 
         ${
             task.description
@@ -748,9 +1103,11 @@ export function createAdminTaskCard(
                 : ""
         }
 
+
         <div class="admin-assigned-user">
 
             👤
+
             ${escapeHTML(
                 user?.name ||
                 task.assignedToName ||
@@ -759,32 +1116,50 @@ export function createAdminTaskCard(
 
         </div>
 
+
         <div class="task-meta">
 
-            <span class="task-category">
-                ${escapeHTML(category)}
+            <span class="task-badge task-category">
+                ${escapeHTML(
+                    category
+                )}
             </span>
 
-            <span class="task-priority">
-                ${escapeHTML(priority)}
+
+            <span class="task-badge task-priority">
+                ${escapeHTML(
+                    priority
+                )}
             </span>
 
-            <span class="task-status status-${getStatusClass(status)}">
-                ${escapeHTML(status)}
-            </span>
 
-        </div>
-
-        <div class="task-card-bottom">
-
-            <span>
-                📅 ${escapeHTML(
-                    formatDate(task.dueDate)
+            <span
+                class="task-badge task-status
+                status-${getStatusClass(status)}"
+            >
+                ${escapeHTML(
+                    status
                 )}
             </span>
 
         </div>
+
+
+        <div class="task-card-bottom">
+
+            <span class="task-due-date">
+
+                📅 ${escapeHTML(
+                    formatDate(
+                        task.dueDate
+                    )
+                )}
+
+            </span>
+
+        </div>
     `;
+
 
     return card;
 }
@@ -795,63 +1170,96 @@ export function createAdminTaskCard(
 // ========================================
 
 export function renderAdminBoard(
+    columns = {},
     tasks = [],
-    users = [],
-    columns = {}
+    users = []
 ) {
-    const todoColumn = columns.todo;
-    const inProgressColumn = columns.inProgress;
-    const inReviewColumn = columns.inReview;
-    const doneColumn = columns.done;
 
-    const todoCount = columns.todoCount;
-    const inProgressCount = columns.inProgressCount;
-    const inReviewCount = columns.inReviewCount;
-    const doneCount = columns.doneCount;
+    const todoColumn =
+        columns.todo;
 
-    [
+    const inProgressColumn =
+        columns.inProgress;
+
+    const inReviewColumn =
+        columns.inReview;
+
+    const doneColumn =
+        columns.done;
+
+
+    const allColumns = [
+
         todoColumn,
+
         inProgressColumn,
+
         inReviewColumn,
+
         doneColumn
-    ].forEach(column => {
+    ];
+
+
+    allColumns.forEach(column => {
+
         if (column) {
             column.innerHTML = "";
         }
     });
 
-    const userMap = new Map();
+
+    const userMap =
+        new Map();
+
 
     users.forEach(user => {
-        userMap.set(user.id, user);
+
+        userMap.set(
+            user.id,
+            user
+        );
     });
 
+
     const grouped = {
+
         "To Do": [],
+
         "In Progress": [],
+
         "In Review": [],
+
         "Done": []
     };
 
-    tasks.forEach(task => {
-        const status = task.status || "To Do";
 
-        if (grouped[status]) {
-            grouped[status].push(task);
-        } else {
-            grouped["To Do"].push(task);
-        }
+    tasks.forEach(task => {
+
+        const status =
+            normalizeStatus(
+                task.status
+            );
+
+
+        grouped[status].push(task);
     });
+
 
     function addTasks(
         taskList,
         column
     ) {
+
         if (!column) return;
 
+
         taskList.forEach(task => {
+
             const user =
-                userMap.get(task.assignedTo);
+                userMap.get(
+                    task.assignedTo
+                );
+
 
             column.appendChild(
                 createAdminTaskCard(
@@ -862,43 +1270,55 @@ export function renderAdminBoard(
         });
     }
 
+
     addTasks(
         grouped["To Do"],
         todoColumn
     );
+
 
     addTasks(
         grouped["In Progress"],
         inProgressColumn
     );
 
+
     addTasks(
         grouped["In Review"],
         inReviewColumn
     );
+
 
     addTasks(
         grouped["Done"],
         doneColumn
     );
 
-    if (todoCount) {
-        todoCount.textContent =
+
+    if (columns.todoCount) {
+
+        columns.todoCount.textContent =
             grouped["To Do"].length;
     }
 
-    if (inProgressCount) {
-        inProgressCount.textContent =
+
+    if (columns.inProgressCount) {
+
+        columns.inProgressCount.textContent =
             grouped["In Progress"].length;
     }
 
-    if (inReviewCount) {
-        inReviewCount.textContent =
+
+    if (columns.inReviewCount) {
+
+        columns.inReviewCount.textContent =
             grouped["In Review"].length;
     }
 
-    if (doneCount) {
-        doneCount.textContent =
+
+    if (columns.doneCount) {
+
+        columns.doneCount.textContent =
             grouped["Done"].length;
     }
 }
@@ -912,7 +1332,9 @@ export function renderUserSelect(
     select,
     users = []
 ) {
+
     if (!select) return;
+
 
     select.innerHTML = `
         <option value="">
@@ -920,15 +1342,23 @@ export function renderUserSelect(
         </option>
     `;
 
+
     users.forEach(user => {
+
         const option =
             document.createElement("option");
 
-        option.value = user.id;
+
+        option.value =
+            user.id;
+
 
         option.textContent =
             `${user.name} (${user.email})`;
 
-        select.appendChild(option);
+
+        select.appendChild(
+            option
+        );
     });
 }
