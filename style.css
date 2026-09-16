@@ -40,6 +40,10 @@ button {
     cursor: pointer;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 .hidden {
     display: none !important;
 }
@@ -164,7 +168,11 @@ textarea {
     justify-content: center;
     padding: 30px 20px;
     background:
-        radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 35%),
+        radial-gradient(
+            circle at top left,
+            rgba(37, 99, 235, 0.12),
+            transparent 35%
+        ),
         var(--background);
 }
 
@@ -440,6 +448,57 @@ textarea {
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-wrap: wrap;
+}
+
+#adminAssignMessage {
+    min-height: 18px;
+}
+
+
+/* =========================
+   ADMIN BOARD
+========================= */
+
+.admin-board-column {
+    min-width: 0;
+}
+
+.admin-task-card {
+    display: block;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 13px;
+    cursor: grab;
+    transition: 0.2s ease;
+}
+
+.admin-task-card:hover {
+    box-shadow: 0 5px 16px rgba(15, 23, 42, 0.07);
+    transform: translateY(-1px);
+}
+
+.admin-task-card.dragging {
+    opacity: 0.5;
+}
+
+.admin-task-card .task-title {
+    margin-bottom: 6px;
+}
+
+.admin-task-card .task-meta {
+    margin-top: 9px;
+}
+
+.admin-task-card .task-actions {
+    margin-top: 10px;
+}
+
+.admin-task-user {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 7px;
 }
 
 
@@ -475,11 +534,21 @@ textarea {
     color: #374151;
 }
 
+.project-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 .project-btn.active {
     background: #eff6ff;
     border-color: var(--primary);
     color: var(--primary);
     font-weight: 700;
+}
+
+.project-item {
+    display: inline-flex;
+    align-items: center;
 }
 
 
@@ -591,6 +660,11 @@ textarea {
     color: #374151;
     padding: 8px 11px;
     border-radius: 8px;
+}
+
+.filter-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
 }
 
 .filter-btn.active {
@@ -891,6 +965,7 @@ textarea {
     border: 1px solid var(--border);
     border-radius: 11px;
     padding: 17px;
+    background: white;
 }
 
 .report-header {
@@ -933,6 +1008,7 @@ textarea {
     height: 100%;
     background: var(--primary);
     border-radius: inherit;
+    transition: width 0.3s ease;
 }
 
 .report-stats {
@@ -987,6 +1063,10 @@ textarea {
     font-size: 28px;
     color: var(--muted);
     line-height: 1;
+}
+
+.icon-btn:hover {
+    color: var(--text);
 }
 
 .dialog-body {
@@ -1100,6 +1180,10 @@ textarea {
     font-weight: 700;
 }
 
+.undo-btn:hover {
+    color: white;
+}
+
 
 /* =========================
    RESPONSIVE
@@ -1162,6 +1246,15 @@ textarea {
 
     .task-detail-meta {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .admin-user-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .admin-user-stats {
+        flex-wrap: wrap;
     }
 }
 
@@ -1228,5 +1321,18 @@ textarea {
 
     .data-actions {
         flex-direction: column;
+    }
+
+    .admin-form-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-form-actions .primary-btn {
+        width: 100%;
+    }
+
+    .admin-task-card {
+        padding: 11px;
     }
 }
