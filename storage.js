@@ -50,7 +50,7 @@ function makeId(prefix = "id") {
 // SAFE STORAGE HELPERS
 // ==========================================
 
-function readJSON(key, fallback = []) {
+function readJSON(key, fallback) {
     try {
         const value = localStorage.getItem(key);
 
@@ -91,7 +91,10 @@ export function loadUsers() {
 
 
 export function saveUsers(users) {
-    return writeJSON(USERS_KEY, users);
+    return writeJSON(
+        USERS_KEY,
+        Array.isArray(users) ? users : []
+    );
 }
 
 
@@ -100,15 +103,18 @@ export function findUserByEmail(email) {
         return null;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = String(email)
+        .trim()
+        .toLowerCase();
 
     const users = loadUsers();
 
     return (
         users.find(
             user =>
+                user &&
                 user.email &&
-                user.email.toLowerCase() === cleanEmail
+                String(user.email).toLowerCase() === cleanEmail
         ) || null
     );
 }
@@ -121,8 +127,13 @@ export function findUserByEmail(email) {
 export function registerUser(name, email, password) {
 
     const cleanName = String(name || "").trim();
-    const cleanEmail = String(email || "").trim().toLowerCase();
+
+    const cleanEmail = String(email || "")
+        .trim()
+        .toLowerCase();
+
     const cleanPassword = String(password || "");
+
 
     if (!cleanName) {
         return {
@@ -131,12 +142,14 @@ export function registerUser(name, email, password) {
         };
     }
 
+
     if (!cleanEmail) {
         return {
             success: false,
             message: "Please enter your email."
         };
     }
+
 
     if (!cleanPassword) {
         return {
@@ -145,12 +158,14 @@ export function registerUser(name, email, password) {
         };
     }
 
+
     if (cleanPassword.length < 4) {
         return {
             success: false,
             message: "Password must contain at least 4 characters."
         };
     }
+
 
     if (cleanEmail === MASTER_ADMIN.email) {
         return {
@@ -159,12 +174,14 @@ export function registerUser(name, email, password) {
         };
     }
 
+
     if (findUserByEmail(cleanEmail)) {
         return {
             success: false,
             message: "An account with this email already exists."
         };
     }
+
 
     const newUser = {
         id: makeId("user"),
@@ -175,17 +192,22 @@ export function registerUser(name, email, password) {
         createdAt: new Date().toISOString()
     };
 
+
     const users = loadUsers();
 
     users.push(newUser);
 
     saveUsers(users);
 
-    // Create empty user storage
+
+    // Create empty storage
     saveTasks(newUser.id, []);
     saveProjects(newUser.id, []);
 
+
+    // Create default project
     ensureDefaultProject(newUser.id);
+
 
     return {
         success: true,
@@ -195,14 +217,15 @@ export function registerUser(name, email, password) {
 
 
 // ==========================================
-// MASTER / ADMIN
+// MASTER ADMIN
 // ==========================================
 
 export function isMasterCredentials(email, password) {
 
     return (
-        String(email || "").trim().toLowerCase() ===
-            MASTER_ADMIN.email &&
+        String(email || "")
+            .trim()
+            .toLowerCase() === MASTER_ADMIN.email &&
         String(password || "") === MASTER_ADMIN.password
     );
 }
@@ -224,7 +247,12 @@ export function isAdmin(user) {
 
 
 export function getAllRegularUsers() {
-    return loadUsers();
+
+    return loadUsers().filter(
+        user =>
+            user &&
+            user.role !== "admin"
+    );
 }
 
 
@@ -234,14 +262,22 @@ export function getAllRegularUsers() {
 
 export function loginUser(email, password) {
 
-    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanEmail = String(email || "")
+        .trim()
+        .toLowerCase();
+
     const cleanPassword = String(password || "");
 
+
+    // --------------------------------------
     // MASTER ADMIN LOGIN
+    // --------------------------------------
+
     if (
         cleanEmail === MASTER_ADMIN.email &&
         cleanPassword === MASTER_ADMIN.password
     ) {
+
         const adminUser = getMasterUser();
 
         setCurrentUser(adminUser);
@@ -252,8 +288,13 @@ export function loginUser(email, password) {
         };
     }
 
+
+    // --------------------------------------
     // NORMAL USER LOGIN
+    // --------------------------------------
+
     const user = findUserByEmail(cleanEmail);
+
 
     if (!user) {
         return {
@@ -262,6 +303,7 @@ export function loginUser(email, password) {
         };
     }
 
+
     if (user.password !== cleanPassword) {
         return {
             success: false,
@@ -269,7 +311,9 @@ export function loginUser(email, password) {
         };
     }
 
+
     setCurrentUser(user);
+
 
     return {
         success: true,
@@ -285,7 +329,9 @@ export function loginUser(email, password) {
 export function getCurrentUser() {
 
     try {
-        const value = localStorage.getItem(SESSION_KEY);
+
+        const value =
+            localStorage.getItem(SESSION_KEY);
 
         if (!value) {
             return null;
@@ -296,7 +342,12 @@ export function getCurrentUser() {
         return user || null;
 
     } catch (error) {
-        console.error("Session read error:", error);
+
+        console.error(
+            "Session read error:",
+            error
+        );
+
         return null;
     }
 }
@@ -331,13 +382,23 @@ export function loadTasks(userId) {
         return [];
     }
 
-    const allTasks = readJSON(TASKS_KEY, {});
 
-    if (!allTasks || typeof allTasks !== "object") {
+    const allTasks =
+        readJSON(TASKS_KEY, {});
+
+
+    if (
+        !allTasks ||
+        typeof allTasks !== "object" ||
+        Array.isArray(allTasks)
+    ) {
         return [];
     }
 
-    const userTasks = allTasks[userId];
+
+    const userTasks =
+        allTasks[userId];
+
 
     return Array.isArray(userTasks)
         ? userTasks
@@ -351,17 +412,30 @@ export function saveTasks(userId, tasks) {
         return false;
     }
 
-    const allTasks = readJSON(TASKS_KEY, {});
 
-    if (!allTasks || typeof allTasks !== "object") {
+    const allTasks =
+        readJSON(TASKS_KEY, {});
+
+
+    if (
+        !allTasks ||
+        typeof allTasks !== "object" ||
+        Array.isArray(allTasks)
+    ) {
         return false;
     }
 
-    allTasks[userId] = Array.isArray(tasks)
-        ? tasks
-        : [];
 
-    return writeJSON(TASKS_KEY, allTasks);
+    allTasks[userId] =
+        Array.isArray(tasks)
+            ? tasks
+            : [];
+
+
+    return writeJSON(
+        TASKS_KEY,
+        allTasks
+    );
 }
 
 
@@ -369,19 +443,29 @@ export function saveTasks(userId, tasks) {
 // CREATE TASK
 // ==========================================
 
-export function createTask(userId, taskData = {}) {
+export function createTask(
+    userId,
+    taskData = {}
+) {
 
     if (!userId) {
         return null;
     }
 
+
     const task = {
+
         id: makeId("task"),
 
-        title: String(taskData.title || "").trim(),
+        title:
+            String(
+                taskData.title || ""
+            ).trim(),
 
         description:
-            String(taskData.description || "").trim(),
+            String(
+                taskData.description || ""
+            ).trim(),
 
         category:
             taskData.category || "Work",
@@ -396,22 +480,29 @@ export function createTask(userId, taskData = {}) {
             taskData.dueDate || "",
 
         projectId:
-            taskData.projectId || null,
+            taskData.projectId ||
+            ensureDefaultProject(userId)?.id ||
+            null,
 
         assignedTo:
-            taskData.assignedTo || userId,
+            taskData.assignedTo ||
+            userId,
 
         createdBy:
-            taskData.createdBy || userId,
+            taskData.createdBy ||
+            userId,
 
         createdAt:
-            taskData.createdAt || new Date().toISOString(),
+            taskData.createdAt ||
+            new Date().toISOString(),
 
         updatedAt:
             new Date().toISOString(),
 
         notes:
-            String(taskData.notes || ""),
+            String(
+                taskData.notes || ""
+            ),
 
         subtasks:
             Array.isArray(taskData.subtasks)
@@ -419,11 +510,19 @@ export function createTask(userId, taskData = {}) {
                 : []
     };
 
-    const tasks = loadTasks(userId);
+
+    const tasks =
+        loadTasks(userId);
+
 
     tasks.push(task);
 
-    saveTasks(userId, tasks);
+
+    saveTasks(
+        userId,
+        tasks
+    );
+
 
     return task;
 }
@@ -447,13 +546,19 @@ export function loadUserTasksForAdmin(userId) {
 // ADMIN - SAVE USER TASKS
 // ==========================================
 
-export function saveUserTasksForAdmin(userId, tasks) {
+export function saveUserTasksForAdmin(
+    userId,
+    tasks
+) {
 
     if (!userId) {
         return false;
     }
 
-    return saveTasks(userId, tasks);
+    return saveTasks(
+        userId,
+        tasks
+    );
 }
 
 
@@ -471,14 +576,25 @@ export function createAssignedTask(
         return null;
     }
 
+
+    // Make sure the user has a project
+    const defaultProject =
+        ensureDefaultProject(userId);
+
+
     const assignedTask = {
+
         id: makeId("task"),
 
         title:
-            String(taskData.title || "").trim(),
+            String(
+                taskData.title || ""
+            ).trim(),
 
         description:
-            String(taskData.description || "").trim(),
+            String(
+                taskData.description || ""
+            ).trim(),
 
         category:
             taskData.category || "Work",
@@ -492,8 +608,13 @@ export function createAssignedTask(
         dueDate:
             taskData.dueDate || "",
 
+        // Important:
+        // Assigned tasks should belong
+        // to a visible user project.
         projectId:
-            taskData.projectId || null,
+            taskData.projectId ||
+            defaultProject?.id ||
+            null,
 
         assignedTo:
             userId,
@@ -512,13 +633,76 @@ export function createAssignedTask(
         subtasks: []
     };
 
-    const tasks = loadTasks(userId);
+
+    const tasks =
+        loadTasks(userId);
+
 
     tasks.push(assignedTask);
 
-    saveTasks(userId, tasks);
+
+    saveTasks(
+        userId,
+        tasks
+    );
+
 
     return assignedTask;
+}
+
+
+// ==========================================
+// UPDATE TASK
+// ==========================================
+
+export function updateTask(
+    userId,
+    taskId,
+    updates = {}
+) {
+
+    if (!userId || !taskId) {
+        return null;
+    }
+
+
+    const tasks =
+        loadTasks(userId);
+
+
+    const index =
+        tasks.findIndex(
+            task =>
+                task &&
+                task.id === taskId
+        );
+
+
+    if (index === -1) {
+        return null;
+    }
+
+
+    const updatedTask = {
+        ...tasks[index],
+        ...updates,
+        id: tasks[index].id,
+        updatedAt:
+            new Date().toISOString()
+    };
+
+
+    tasks[index] =
+        updatedTask;
+
+
+    saveTasks(
+        userId,
+        tasks
+    );
+
+
+    return updatedTask;
 }
 
 
@@ -526,29 +710,101 @@ export function createAssignedTask(
 // DELETE TASK
 // ==========================================
 
-export function deleteTask(userId, taskId) {
+export function deleteTask(
+    userId,
+    taskId
+) {
 
     if (!userId || !taskId) {
         return null;
     }
 
-    const tasks = loadTasks(userId);
 
-    const index = tasks.findIndex(
-        task => task.id === taskId
-    );
+    const tasks =
+        loadTasks(userId);
+
+
+    const index =
+        tasks.findIndex(
+            task =>
+                task &&
+                task.id === taskId
+        );
+
 
     if (index === -1) {
         return null;
     }
 
-    const deletedTask = tasks[index];
 
-    tasks.splice(index, 1);
+    const deletedTask =
+        tasks[index];
 
-    saveTasks(userId, tasks);
+
+    tasks.splice(
+        index,
+        1
+    );
+
+
+    saveTasks(
+        userId,
+        tasks
+    );
+
 
     return deletedTask;
+}
+
+
+// ==========================================
+// UNDO DELETE
+// ==========================================
+
+export function undoDeleteTask(
+    userId,
+    task
+) {
+
+    if (
+        !userId ||
+        !task ||
+        !task.id
+    ) {
+        return null;
+    }
+
+
+    const tasks =
+        loadTasks(userId);
+
+
+    const alreadyExists =
+        tasks.some(
+            existingTask =>
+                existingTask.id === task.id
+        );
+
+
+    if (alreadyExists) {
+        return task;
+    }
+
+
+    tasks.push({
+        ...task,
+        updatedAt:
+            new Date().toISOString()
+    });
+
+
+    saveTasks(
+        userId,
+        tasks
+    );
+
+
+    return task;
 }
 
 
@@ -562,19 +818,26 @@ export function loadProjects(userId) {
         return [];
     }
 
-    const allProjects = readJSON(
-        PROJECTS_KEY,
-        {}
-    );
+
+    const allProjects =
+        readJSON(
+            PROJECTS_KEY,
+            {}
+        );
+
 
     if (
         !allProjects ||
-        typeof allProjects !== "object"
+        typeof allProjects !== "object" ||
+        Array.isArray(allProjects)
     ) {
         return [];
     }
 
-    const projects = allProjects[userId];
+
+    const projects =
+        allProjects[userId];
+
 
     return Array.isArray(projects)
         ? projects
@@ -582,28 +845,37 @@ export function loadProjects(userId) {
 }
 
 
-export function saveProjects(userId, projects) {
+export function saveProjects(
+    userId,
+    projects
+) {
 
     if (!userId) {
         return false;
     }
 
-    const allProjects = readJSON(
-        PROJECTS_KEY,
-        {}
-    );
+
+    const allProjects =
+        readJSON(
+            PROJECTS_KEY,
+            {}
+        );
+
 
     if (
         !allProjects ||
-        typeof allProjects !== "object"
+        typeof allProjects !== "object" ||
+        Array.isArray(allProjects)
     ) {
         return false;
     }
+
 
     allProjects[userId] =
         Array.isArray(projects)
             ? projects
             : [];
+
 
     return writeJSON(
         PROJECTS_KEY,
@@ -625,14 +897,20 @@ export function createProject(
         return null;
     }
 
+
     const cleanName =
-        String(projectName || "").trim();
+        String(
+            projectName || ""
+        ).trim();
+
 
     if (!cleanName) {
         return null;
     }
 
+
     const project = {
+
         id: makeId("project"),
 
         name: cleanName,
@@ -641,12 +919,19 @@ export function createProject(
             new Date().toISOString()
     };
 
+
     const projects =
         loadProjects(userId);
 
+
     projects.push(project);
 
-    saveProjects(userId, projects);
+
+    saveProjects(
+        userId,
+        projects
+    );
+
 
     return project;
 }
@@ -662,14 +947,18 @@ export function ensureDefaultProject(userId) {
         return null;
     }
 
+
     let projects =
         loadProjects(userId);
+
 
     if (projects.length > 0) {
         return projects[0];
     }
 
+
     const defaultProject = {
+
         id: makeId("project"),
 
         name: "My Tasks",
@@ -678,12 +967,17 @@ export function ensureDefaultProject(userId) {
             new Date().toISOString()
     };
 
-    projects = [defaultProject];
+
+    projects = [
+        defaultProject
+    ];
+
 
     saveProjects(
         userId,
         projects
     );
+
 
     return defaultProject;
 }
@@ -698,18 +992,24 @@ export function deleteProject(
     projectId
 ) {
 
-    if (!userId || !projectId) {
+    if (
+        !userId ||
+        !projectId
+    ) {
         return false;
     }
 
+
     const projects =
         loadProjects(userId);
+
 
     const filteredProjects =
         projects.filter(
             project =>
                 project.id !== projectId
         );
+
 
     if (
         filteredProjects.length ===
@@ -718,32 +1018,54 @@ export function deleteProject(
         return false;
     }
 
+
+    // Do not allow the user
+    // to remove their only project.
+    if (
+        filteredProjects.length === 0
+    ) {
+        return false;
+    }
+
+
     saveProjects(
         userId,
         filteredProjects
     );
 
-    // Remove project reference from tasks
+
+    // Remove project reference
+    // from existing tasks.
     const tasks =
         loadTasks(userId);
+
 
     const updatedTasks =
         tasks.map(task => {
 
-            if (task.projectId === projectId) {
+            if (
+                task.projectId === projectId
+            ) {
+
                 return {
                     ...task,
-                    projectId: null
+                    projectId:
+                        filteredProjects[0].id,
+                    updatedAt:
+                        new Date().toISOString()
                 };
             }
 
+
             return task;
         });
+
 
     saveTasks(
         userId,
         updatedTasks
     );
+
 
     return true;
 }
@@ -759,26 +1081,55 @@ export function clearUserData(userId) {
         return false;
     }
 
+
     const allTasks =
-        readJSON(TASKS_KEY, {});
+        readJSON(
+            TASKS_KEY,
+            {}
+        );
+
 
     const allProjects =
-        readJSON(PROJECTS_KEY, {});
+        readJSON(
+            PROJECTS_KEY,
+            {}
+        );
 
-    delete allTasks[userId];
-    delete allProjects[userId];
 
-    writeJSON(
-        TASKS_KEY,
-        allTasks
+    if (
+        allTasks &&
+        typeof allTasks === "object"
+    ) {
+        delete allTasks[userId];
+    }
+
+
+    if (
+        allProjects &&
+        typeof allProjects === "object"
+    ) {
+        delete allProjects[userId];
+    }
+
+
+    const tasksSaved =
+        writeJSON(
+            TASKS_KEY,
+            allTasks
+        );
+
+
+    const projectsSaved =
+        writeJSON(
+            PROJECTS_KEY,
+            allProjects
+        );
+
+
+    return (
+        tasksSaved &&
+        projectsSaved
     );
-
-    writeJSON(
-        PROJECTS_KEY,
-        allProjects
-    );
-
-    return true;
 }
 
 
@@ -786,13 +1137,17 @@ export function clearUserData(userId) {
 // EXPORT USER DATA
 // ==========================================
 
-export function getUserDataForExport(userId) {
+export function getUserDataForExport(
+    userId
+) {
 
     if (!userId) {
         return null;
     }
 
+
     return {
+
         exportedAt:
             new Date().toISOString(),
 
@@ -816,23 +1171,45 @@ export function importUserData(
     data
 ) {
 
-    if (!userId || !data) {
+    if (
+        !userId ||
+        !data ||
+        typeof data !== "object"
+    ) {
         return false;
     }
 
-    if (Array.isArray(data.tasks)) {
+
+    if (
+        Array.isArray(data.tasks)
+    ) {
+
         saveTasks(
             userId,
             data.tasks
         );
     }
 
-    if (Array.isArray(data.projects)) {
+
+    if (
+        Array.isArray(data.projects)
+    ) {
+
         saveProjects(
             userId,
             data.projects
         );
     }
+
+
+    // Make sure imported data
+    // still has a project.
+    if (
+        loadProjects(userId).length === 0
+    ) {
+        ensureDefaultProject(userId);
+    }
+
 
     return true;
 }
