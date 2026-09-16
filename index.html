@@ -6,7 +6,7 @@
 
     <title>Task Manager V2</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
@@ -40,10 +40,7 @@
                 <form id="loginForm">
 
                     <div class="form-group">
-
-                        <label for="loginEmail">
-                            Email
-                        </label>
+                        <label for="loginEmail">Email</label>
 
                         <input
                             type="email"
@@ -52,15 +49,10 @@
                             autocomplete="email"
                             required
                         >
-
                     </div>
 
-
                     <div class="form-group">
-
-                        <label for="loginPassword">
-                            Password
-                        </label>
+                        <label for="loginPassword">Password</label>
 
                         <input
                             type="password"
@@ -69,16 +61,13 @@
                             autocomplete="current-password"
                             required
                         >
-
                     </div>
-
 
                     <p
                         id="loginError"
                         class="form-error"
                         aria-live="polite"
                     ></p>
-
 
                     <button
                         type="submit"
@@ -88,7 +77,6 @@
                     </button>
 
                 </form>
-
 
                 <div class="auth-switch">
 
@@ -105,7 +93,6 @@
                     </button>
 
                 </div>
-
 
                 <div class="admin-login-hint">
 
@@ -143,7 +130,6 @@
                     Create your account to start managing tasks.
                 </p>
 
-
                 <form id="registerForm">
 
                     <div class="form-group">
@@ -162,7 +148,6 @@
 
                     </div>
 
-
                     <div class="form-group">
 
                         <label for="registerEmail">
@@ -178,7 +163,6 @@
                         >
 
                     </div>
-
 
                     <div class="form-group">
 
@@ -196,13 +180,11 @@
 
                     </div>
 
-
                     <p
                         id="registerError"
                         class="form-error"
                         aria-live="polite"
                     ></p>
-
 
                     <button
                         type="submit"
@@ -212,7 +194,6 @@
                     </button>
 
                 </form>
-
 
                 <div class="auth-switch">
 
@@ -235,7 +216,6 @@
         </section>
 
     </main>
-
 
 
     <!-- ==========================================
@@ -271,7 +251,6 @@
 
             </div>
 
-
             <div class="header-right">
 
                 <span
@@ -292,7 +271,6 @@
             </div>
 
         </header>
-
 
 
         <!-- ==========================================
@@ -343,7 +321,6 @@
 
                     </article>
 
-
                     <article class="summary-card">
 
                         <span class="summary-label">
@@ -356,7 +333,6 @@
 
                     </article>
 
-
                     <article class="summary-card">
 
                         <span class="summary-label">
@@ -368,7 +344,6 @@
                         </strong>
 
                     </article>
-
 
                     <article class="summary-card">
 
@@ -383,7 +358,6 @@
                     </article>
 
                 </div>
-
 
 
                 <!-- ==================================
@@ -408,14 +382,12 @@
 
                     </div>
 
-
                     <div
                         id="adminUsersList"
                         class="admin-users-list"
                     ></div>
 
                 </section>
-
 
 
                 <!-- ==================================
@@ -439,7 +411,6 @@
                         </div>
 
                     </div>
-
 
                     <form
                         id="adminAssignTaskForm"
@@ -466,7 +437,6 @@
                                 </select>
 
                             </div>
-
 
                             <div class="form-group">
 
@@ -540,7 +510,10 @@
                                         Low
                                     </option>
 
-                                    <option value="Medium" selected>
+                                    <option
+                                        value="Medium"
+                                        selected
+                                    >
                                         Medium
                                     </option>
 
@@ -608,7 +581,6 @@
                 </section>
 
 
-
                 <!-- ==================================
                      ADMIN TASK BOARD
                 =================================== -->
@@ -646,7 +618,6 @@
 
                         </article>
 
-
                         <article class="summary-card">
 
                             <span class="summary-label">
@@ -659,7 +630,6 @@
 
                         </article>
 
-
                         <article class="summary-card">
 
                             <span class="summary-label">
@@ -671,7 +641,6 @@
                             </strong>
 
                         </article>
-
 
                         <article class="summary-card">
 
@@ -690,9 +659,11 @@
 
                     <div class="kanban-board">
 
+                        <!-- ADMIN TO DO -->
+
                         <div
                             id="adminTodoColumn"
-                            class="kanban-column"
+                            class="kanban-column admin-board-column"
                             data-status="To Do"
                         >
 
@@ -708,22 +679,22 @@
 
                                 </div>
 
-                                <span>
+                                <span class="admin-column-count">
                                     0
                                 </span>
 
                             </div>
-
 
                             <div class="kanban-task-list"></div>
 
                         </div>
 
 
+                        <!-- ADMIN IN PROGRESS -->
 
                         <div
                             id="adminInProgressColumn"
-                            class="kanban-column"
+                            class="kanban-column admin-board-column"
                             data-status="In Progress"
                         >
 
@@ -739,22 +710,22 @@
 
                                 </div>
 
-                                <span>
+                                <span class="admin-column-count">
                                     0
                                 </span>
 
                             </div>
-
 
                             <div class="kanban-task-list"></div>
 
                         </div>
 
 
+                        <!-- ADMIN IN REVIEW -->
 
                         <div
                             id="adminInReviewColumn"
-                            class="kanban-column"
+                            class="kanban-column admin-board-column"
                             data-status="In Review"
                         >
 
@@ -770,22 +741,22 @@
 
                                 </div>
 
-                                <span>
+                                <span class="admin-column-count">
                                     0
                                 </span>
 
                             </div>
-
 
                             <div class="kanban-task-list"></div>
 
                         </div>
 
 
+                        <!-- ADMIN DONE -->
 
                         <div
                             id="adminDoneColumn"
-                            class="kanban-column"
+                            class="kanban-column admin-board-column"
                             data-status="Done"
                         >
 
@@ -801,12 +772,11 @@
 
                                 </div>
 
-                                <span>
+                                <span class="admin-column-count">
                                     0
                                 </span>
 
                             </div>
-
 
                             <div class="kanban-task-list"></div>
 
@@ -815,7 +785,6 @@
                     </div>
 
                 </section>
-
 
 
                 <!-- ==================================
@@ -838,7 +807,6 @@
 
                         </div>
 
-
                         <button
                             type="button"
                             id="refreshAdminReportsBtn"
@@ -849,7 +817,6 @@
 
                     </div>
 
-
                     <div
                         id="adminReportsList"
                         class="admin-reports-list"
@@ -858,6 +825,7 @@
                 </section>
 
 
+                <!-- ADMIN FOOTER -->
 
                 <div class="admin-footer-action">
 
@@ -872,7 +840,6 @@
                 </div>
 
             </section>
-
 
 
             <!-- ======================================
@@ -902,7 +869,6 @@
 
                     </div>
 
-
                     <div class="project-actions">
 
                         <button
@@ -918,7 +884,6 @@
                 </div>
 
 
-
                 <!-- PROJECT SWITCHER -->
 
                 <section
@@ -926,7 +891,6 @@
                     class="project-switcher"
                     aria-label="Projects"
                 ></section>
-
 
 
                 <!-- PROGRESS -->
@@ -949,7 +913,6 @@
 
                     </div>
 
-
                     <div
                         class="progress-bar"
                         role="progressbar"
@@ -966,7 +929,6 @@
                     </div>
 
                 </section>
-
 
 
                 <!-- ==================================
@@ -990,7 +952,6 @@
                         </div>
 
                     </div>
-
 
                     <div class="add-task-form">
 
@@ -1075,7 +1036,6 @@
                     </div>
 
                 </section>
-
 
 
                 <!-- ==================================
@@ -1204,7 +1164,6 @@
                 </section>
 
 
-
                 <!-- ==================================
                      LIST VIEW
                 =================================== -->
@@ -1215,7 +1174,6 @@
                         id="taskList"
                         class="task-list"
                     ></div>
-
 
                     <div
                         id="emptyState"
@@ -1239,7 +1197,6 @@
                 </section>
 
 
-
                 <!-- ==================================
                      KANBAN VIEW
                 =================================== -->
@@ -1248,6 +1205,8 @@
                     id="kanbanBoard"
                     class="kanban-board hidden"
                 >
+
+                    <!-- TO DO -->
 
                     <div
                         class="kanban-column"
@@ -1266,18 +1225,18 @@
 
                             </div>
 
-                            <span>
+                            <span class="column-count">
                                 0
                             </span>
 
                         </div>
-
 
                         <div class="kanban-task-list"></div>
 
                     </div>
 
 
+                    <!-- IN PROGRESS -->
 
                     <div
                         class="kanban-column"
@@ -1296,18 +1255,18 @@
 
                             </div>
 
-                            <span>
+                            <span class="column-count">
                                 0
                             </span>
 
                         </div>
-
 
                         <div class="kanban-task-list"></div>
 
                     </div>
 
 
+                    <!-- IN REVIEW -->
 
                     <div
                         class="kanban-column"
@@ -1326,18 +1285,18 @@
 
                             </div>
 
-                            <span>
+                            <span class="column-count">
                                 0
                             </span>
 
                         </div>
-
 
                         <div class="kanban-task-list"></div>
 
                     </div>
 
 
+                    <!-- DONE -->
 
                     <div
                         class="kanban-column"
@@ -1356,19 +1315,17 @@
 
                             </div>
 
-                            <span>
+                            <span class="column-count">
                                 0
                             </span>
 
                         </div>
-
 
                         <div class="kanban-task-list"></div>
 
                     </div>
 
                 </section>
-
 
 
                 <!-- ==================================
@@ -1387,7 +1344,7 @@
 
 
                     <label
-                        for="importInput"
+                        for="importFileInput"
                         class="secondary-btn file-btn"
                     >
                         Import Tasks
@@ -1395,7 +1352,7 @@
 
                     <input
                         type="file"
-                        id="importInput"
+                        id="importFileInput"
                         accept=".json,application/json"
                         class="hidden"
                     >
@@ -1407,7 +1364,6 @@
         </section>
 
     </main>
-
 
 
     <!-- ==========================================
@@ -1432,7 +1388,6 @@
                 </h2>
 
             </div>
-
 
             <button
                 type="button"
@@ -1477,7 +1432,6 @@
 
                 </div>
 
-
                 <div>
 
                     <span>
@@ -1490,7 +1444,6 @@
 
                 </div>
 
-
                 <div>
 
                     <span>
@@ -1502,7 +1455,6 @@
                     </strong>
 
                 </div>
-
 
                 <div>
 
@@ -1518,6 +1470,8 @@
 
             </div>
 
+
+            <!-- NOTES -->
 
             <div class="form-group">
 
@@ -1608,7 +1562,6 @@
     </dialog>
 
 
-
     <!-- ==========================================
          NEW PROJECT DIALOG
     =========================================== -->
@@ -1631,7 +1584,6 @@
                 </h2>
 
             </div>
-
 
             <button
                 type="button"
@@ -1694,7 +1646,6 @@
     </dialog>
 
 
-
     <!-- ==========================================
          UNDO TOAST
     =========================================== -->
@@ -1721,14 +1672,13 @@
     </div>
 
 
-
     <!-- ==========================================
          JAVASCRIPT
     =========================================== -->
 
     <script
         type="module"
-        src="app.js"
+        src="./app.js"
     ></script>
 
 </body>
