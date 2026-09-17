@@ -1,1 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Task Manager - Login</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="auth-container">
+
+        <div class="auth-card">
+
+            <span class="eyebrow">TASK MANAGER</span>
+
+            <h1 id="authTitle">Welcome Back</h1>
+
+            <p id="authSubtitle">
+                Log in to manage your tasks.
+            </p>
+
+
+            <div
+                id="authError"
+                class="auth-error"
+                hidden
+            ></div>
+
+
+            <form id="authForm">
+
+                <div class="input-group">
+
+                    <label for="usernameInput">
+                        Username
+                    </label>
+
+                    <input
+                        type="text"
+                        id="usernameInput"
+                        placeholder="Enter username"
+                        autocomplete="username"
+                    >
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="passwordInput">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="passwordInput"
+                        placeholder="Enter password"
+                        autocomplete="current-password"
+                    >
+
+                </div>
+
+
+                <div
+                    class="input-group"
+                    id="roleGroup"
+                    hidden
+                >
+
+                    <label for="roleSelect">
+                        Account type
+                    </label>
+
+                    <select id="roleSelect">
+
+                        <option value="user">
+                            User
+                        </option>
+
+                        <option value="admin">
+                            Admin
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    id="authSubmitBtn"
+                    class="primary-btn auth-submit-btn"
+                >
+                    Log In
+                </button>
+
+            </form>
+
+
+            <p class="auth-toggle-text">
+
+                <span id="authToggleLabel">
+                    Don't have an account?
+                </span>
+
+                <button
+                    type="button"
+                    id="authToggleBtn"
+                    class="auth-toggle-btn"
+                >
+                    Sign Up
+                </button>
+
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <script
+        type="module"
+        src="auth-page.js"
+    ></script>
+
+</body>
+
+</html>
