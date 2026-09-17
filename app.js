@@ -1,2567 +1,2496 @@
 import {
-    loadUsers,
-    saveUsers,
-    findUserByEmail,
-    registerUser,
-    loginUser,
-    getCurrentUser,
-    setCurrentUser,
-    clearCurrentUser,
-    isAdmin,
-
     loadTasks,
     saveTasks,
-    createTask,
-    createAssignedTask,
-    updateTask,
-    deleteTask,
-    undoDeleteTask,
-
     loadProjects,
-    saveProjects,
-    createProject,
-    deleteProject,
-    ensureDefaultProject,
-
-    getUserDataForExport,
-    importUserData
+    saveProjects
 } from "./storage.js";
 
 import {
-    renderProjects,
-    renderProgress,
     renderTasks,
-    renderEmptyState,
+    renderProjects,
     renderBoard,
     renderTaskDetail,
     renderSubtasks,
-    renderAdminSummary,
-    renderAdminUsers,
-    renderAdminReports,
-    renderAdminBoard,
-    renderUserSelect
+    renderProgress
 } from "./render.js";
 
+import {
+    requireAuth,
+    logoutUser,
+    getCurrentUserRole
+} from "./auth.js";
 
-// =====================================================
-// STATE
-// =====================================================
 
-let currentUser = null;
+/* =========================
+   AUTH GUARD
+   (Must run before anything else.
+   Redirects to login.html if no
+   one is logged in.)
+========================= */
 
-let tasks = [];
-let projects = [];
+const currentUser = requireAuth();
 
-let activeProjectId = "";
+if (!currentUser) {
 
+    /*
+       requireAuth() already redirected
+       the browser to login.html. Stop
+       the rest of this module from
+       running while that happens.
+    */
+
+    throw new Error(
+        "Not authenticated - redirecting to login."
+    );
+}
+
+
+/* =========================
+   STATE
+========================= */
+
+let tasks = loadTasks();
+let projects = loadProjects();
+
+let activeProjectId = null;
+let activeCategory = "All";
+let searchText = "";
 let currentView = "list";
-let currentCategory = "all";
-let currentSearch = "";
-let currentSort = "newest";
-
-let selectedTaskId = null;
-
-let deletedTaskBackup = null;
-let undoTimer = null;
+let draggedTaskId = null;
+let activeDetailTaskId = null;
 
 
-// =====================================================
-// HELPERS
-// =====================================================
+/* =========================
+   PROJECT MIGRATION
+========================= */
 
-function $(id) {
-    return document.getElementById(id);
+if (projects.length === 0) {
+
+    const defaultProject = {
+        id: crypto.randomUUID(),
+        name: "My Project"
+    };
+
+    projects.push(defaultProject);
+
+    saveProjects(projects);
 }
 
-function show(element, visible = true) {
-    if (!element) return;
+activeProjectId = projects[0].id;
 
-    element.hidden = !visible;
-    element.classList.toggle("hidden", !visible);
-}
 
-function normalizeStatus(status) {
-    const value = String(status || "")
-        .trim()
-        .toLowerCase();
+/* =========================
+   MIGRATE OLD TASKS
+========================= */
 
-    if (
-        value === "todo" ||
-        value === "to-do" ||
-        value === "to do"
-    ) {
-        return "To Do";
+let tasksChanged = false;
+
+tasks = tasks.map(task => {
+
+    const updatedTask = {
+        ...task
+    };
+
+
+    if (!updatedTask.projectId) {
+
+        updatedTask.projectId =
+            activeProjectId;
+
+        tasksChanged = true;
     }
 
-    if (
-        value === "in-progress" ||
-        value === "in progress"
-    ) {
-        return "In Progress";
+
+    if (!updatedTask.status) {
+
+        updatedTask.status =
+            updatedTask.done
+                ? "Done"
+                : "To Do";
+
+        tasksChanged = true;
     }
 
-    if (
-        value === "in-review" ||
-        value === "in review"
-    ) {
-        return "In Review";
+
+    if (!updatedTask.description) {
+        updatedTask.description = "";
     }
 
-    if (value === "done") {
-        return "Done";
+
+    if (!updatedTask.dueDate) {
+        updatedTask.dueDate = "";
     }
 
-    return "To Do";
-}
 
-function getUserById(userId) {
-    const users = loadUsers();
-
-    return users.find(
-        user => String(user.id) === String(userId)
-    ) || null;
-}
-
-
-// =====================================================
-// AUTH ELEMENTS
-// =====================================================
-
-const authScreen = $("authScreen");
-
-const loginSection = $("loginSection");
-const loginForm = $("loginForm");
-const loginEmail = $("loginEmail");
-const loginPassword = $("loginPassword");
-const loginError = $("loginError");
-const showRegisterBtn = $("showRegisterBtn");
-
-const registerSection = $("registerSection");
-const registerForm = $("registerForm");
-const registerName = $("registerName");
-const registerEmail = $("registerEmail");
-const registerPassword = $("registerPassword");
-const registerError = $("registerError");
-const showLoginBtn = $("showLoginBtn");
-
-
-// =====================================================
-// APPLICATION ELEMENTS
-// =====================================================
-
-const appScreen = $("appScreen");
-
-const welcomeMessage = $("welcomeMessage");
-const currentUserRole = $("currentUserRole");
-const logoutBtn = $("logoutBtn");
-
-
-// =====================================================
-// ADMIN ELEMENTS
-// =====================================================
-
-const adminDashboard = $("adminDashboard");
-
-const adminTotalUsers = $("adminTotalUsers");
-const adminTotalTasks = $("adminTotalTasks");
-const adminPendingTasks = $("adminPendingTasks");
-const adminCompletedTasks = $("adminCompletedTasks");
-
-const adminUsersList = $("adminUsersList");
-
-const adminAssignTaskForm = $("adminAssignTaskForm");
-const adminUserSelect = $("adminUserSelect");
-const adminTaskTitle = $("adminTaskTitle");
-const adminTaskDescription = $("adminTaskDescription");
-const adminTaskCategory = $("adminTaskCategory");
-const adminTaskPriority = $("adminTaskPriority");
-const adminTaskDueDate = $("adminTaskDueDate");
-const adminTaskProject = $("adminTaskProject");
-const adminAssignMessage = $("adminAssignMessage");
-
-const adminTodoTasks = $("adminTodoTasks");
-const adminInProgressTasks = $("adminInProgressTasks");
-const adminInReviewTasks = $("adminInReviewTasks");
-const adminDoneTasks = $("adminDoneTasks");
-
-const adminTodoColumn = $("adminTodoColumn");
-const adminInProgressColumn = $("adminInProgressColumn");
-const adminInReviewColumn = $("adminInReviewColumn");
-const adminDoneColumn = $("adminDoneColumn");
-
-const adminReportsList = $("adminReportsList");
-const refreshAdminReportsBtn = $("refreshAdminReportsBtn");
-
-const adminOpenTaskManagerBtn = $("adminOpenTaskManagerBtn");
-
-
-// =====================================================
-// USER ELEMENTS
-// =====================================================
-
-const userTaskManager = $("userTaskManager");
-
-const projectSwitcher = $("projectSwitcher");
-const activeProjectName = $("activeProjectName");
-
-const progressText = $("progressText");
-const progressFill = $("progressFill");
-const progressPercentage = $("progressPercentage");
-
-const newProjectBtn = $("newProjectBtn");
-
-const taskInput = $("taskInput");
-const categorySelect = $("categorySelect");
-const statusSelect = $("statusSelect");
-const addTaskBtn = $("addTaskBtn");
-
-const searchInput = $("searchInput");
-
-const filterButtons = document.querySelectorAll(
-    "[data-category]"
-);
-
-const sortSelect = $("sortSelect");
-
-const listViewBtn = $("listViewBtn");
-const boardViewBtn = $("boardViewBtn");
-
-const taskListView = $("taskListView");
-const taskList = $("taskList");
-const emptyState = $("emptyState");
-const kanbanBoard = $("kanbanBoard");
-
-
-// =====================================================
-// USER KANBAN COLUMNS
-// =====================================================
-
-const todoColumn = document.querySelector(
-    '#kanbanBoard .kanban-column[data-status="To Do"]'
-);
-
-const inProgressColumn = document.querySelector(
-    '#kanbanBoard .kanban-column[data-status="In Progress"]'
-);
-
-const inReviewColumn = document.querySelector(
-    '#kanbanBoard .kanban-column[data-status="In Review"]'
-);
-
-const doneColumn = document.querySelector(
-    '#kanbanBoard .kanban-column[data-status="Done"]'
-);
-
-
-// =====================================================
-// DATA ACTIONS
-// =====================================================
-
-const exportBtn = $("exportBtn");
-const importFileInput = $("importFileInput");
-
-
-// =====================================================
-// TASK DETAIL
-// =====================================================
-
-const taskDetailDialog = $("taskDetailDialog");
-
-const detailTaskTitle = $("detailTaskTitle");
-const detailDescription = $("detailDescription");
-const detailStatus = $("detailStatus");
-const detailPriority = $("detailPriority");
-const detailDueDate = $("detailDueDate");
-const detailCategory = $("detailCategory");
-
-const taskNotes = $("taskNotes");
-const saveNotesBtn = $("saveNotesBtn");
-
-const subtaskInput = $("subtaskInput");
-const addSubtaskBtn = $("addSubtaskBtn");
-const subtaskList = $("subtaskList");
-
-const closeTaskDetailBtn = $("closeTaskDetailBtn");
-const cancelTaskDetailBtn = $("cancelTaskDetailBtn");
-
-
-// =====================================================
-// NEW PROJECT
-// =====================================================
-
-const newProjectDialog = $("newProjectDialog");
-
-const closeNewProjectBtn = $("closeNewProjectBtn");
-const projectNameInput = $("projectNameInput");
-const projectError = $("projectError");
-const cancelProjectBtn = $("cancelProjectBtn");
-const createProjectBtn = $("createProjectBtn");
-
-
-// =====================================================
-// UNDO
-// =====================================================
-
-const undoToast = $("undoToast");
-const undoMessage = $("undoMessage");
-const undoBtn = $("undoBtn");
-
-
-// =====================================================
-// AUTH SCREEN
-// =====================================================
-
-function showAuthScreen() {
-    show(authScreen, true);
-    show(appScreen, false);
-
-    show(loginSection, true);
-    show(registerSection, false);
-
-    if (loginError) {
-        loginError.textContent = "";
+    if (!updatedTask.priority) {
+        updatedTask.priority = "Normal";
     }
 
-    if (registerError) {
-        registerError.textContent = "";
+
+    if (!updatedTask.notes) {
+        updatedTask.notes = "";
     }
-}
 
-function showLoginForm() {
-    show(loginSection, true);
-    show(registerSection, false);
 
-    if (loginError) {
-        loginError.textContent = "";
+    if (!Array.isArray(updatedTask.subtasks)) {
+
+        updatedTask.subtasks = [];
     }
-}
 
-function showRegisterForm() {
-    show(loginSection, false);
-    show(registerSection, true);
 
-    if (registerError) {
-        registerError.textContent = "";
-    }
+    /*
+       Make sure every subtask uses
+       the same "done" property.
+    */
+
+    updatedTask.subtasks =
+        updatedTask.subtasks.map(
+            subtask => ({
+
+                id:
+                    subtask.id ||
+                    crypto.randomUUID(),
+
+                text:
+                    subtask.text || "",
+
+                done:
+                    Boolean(
+                        subtask.done ??
+                        subtask.completed
+                    )
+            })
+        );
+
+
+    return updatedTask;
+});
+
+
+if (tasksChanged) {
+    saveTasks(tasks);
 }
 
 
-// =====================================================
-// LOGIN
-// =====================================================
+/* =========================
+   DOM ELEMENTS
+========================= */
 
-function handleLogin(event) {
-    event.preventDefault();
+const taskInput =
+    document.getElementById("taskInput");
 
-    if (!loginEmail || !loginPassword) {
-        return;
-    }
+const categorySelect =
+    document.getElementById("categorySelect");
 
-    const email = loginEmail.value.trim();
-    const password = loginPassword.value;
+const statusSelect =
+    document.getElementById("statusSelect");
 
-    if (loginError) {
-        loginError.textContent = "";
-    }
+const addTaskBtn =
+    document.getElementById("addTaskBtn");
 
-    if (!email || !password) {
-        if (loginError) {
-            loginError.textContent =
-                "Please enter email and password.";
-        }
+const searchInput =
+    document.getElementById("searchInput");
 
-        return;
-    }
+const sortSelect =
+    document.getElementById("sortSelect");
 
-    const result = loginUser(email, password);
-
-    if (!result || !result.success) {
-
-        if (loginError) {
-            loginError.textContent =
-                result?.message ||
-                "Invalid email or password.";
-        }
-
-        return;
-    }
-
-    currentUser = result.user;
-
-    setCurrentUser(currentUser);
-
-    openApplication(currentUser);
-}
-
-
-// =====================================================
-// REGISTER
-// =====================================================
-
-function handleRegister(event) {
-    event.preventDefault();
-
-    const name = registerName?.value.trim();
-    const email = registerEmail?.value.trim();
-    const password = registerPassword?.value;
-
-    if (registerError) {
-        registerError.textContent = "";
-    }
-
-    if (!name || !email || !password) {
-
-        if (registerError) {
-            registerError.textContent =
-                "Please fill all fields.";
-        }
-
-        return;
-    }
-
-    if (password.length < 6) {
-
-        if (registerError) {
-            registerError.textContent =
-                "Password must be at least 6 characters.";
-        }
-
-        return;
-    }
-
-    const existingUser = findUserByEmail(email);
-
-    if (existingUser) {
-
-        if (registerError) {
-            registerError.textContent =
-                "An account with this email already exists.";
-        }
-
-        return;
-    }
-
-    const result = registerUser(
-        name,
-        email,
-        password
+const filterButtons =
+    document.querySelectorAll(
+        "#categoryFilters button"
     );
 
-    if (!result || !result.success) {
+const taskList =
+    document.getElementById("taskList");
 
-        if (registerError) {
-            registerError.textContent =
-                result?.message ||
-                "Unable to create account.";
-        }
+const exportBtn =
+    document.getElementById("exportBtn");
 
-        return;
-    }
+const importInput =
+    document.getElementById("importInput");
 
-    if (registerForm) {
-        registerForm.reset();
-    }
+const undoToast =
+    document.getElementById("undoToast");
 
-    showLoginForm();
+const undoBtn =
+    document.getElementById("undoBtn");
 
-    if (loginError) {
-        loginError.textContent =
-            "Account created successfully. Please login.";
-    }
 
-    if (loginEmail) {
-        loginEmail.value = email;
-    }
+/* =========================
+   AUTH ELEMENTS
+========================= */
 
-    if (loginPassword) {
-        loginPassword.value = "";
-    }
+const currentUserLabel =
+    document.getElementById(
+        "currentUserLabel"
+    );
+
+const logoutBtn =
+    document.getElementById(
+        "logoutBtn"
+    );
+
+const adminDashboardLink =
+    document.getElementById(
+        "adminDashboardLink"
+    );
+
+
+/* =========================
+   PROJECT ELEMENTS
+========================= */
+
+const projectSwitcher =
+    document.getElementById(
+        "projectSwitcher"
+    );
+
+const newProjectBtn =
+    document.getElementById(
+        "newProjectBtn"
+    );
+
+const newProjectDialog =
+    document.getElementById(
+        "newProjectDialog"
+    );
+
+const projectNameInput =
+    document.getElementById(
+        "projectNameInput"
+    );
+
+const createProjectBtn =
+    document.getElementById(
+        "createProjectBtn"
+    );
+
+const cancelProjectBtn =
+    document.getElementById(
+        "cancelProjectBtn"
+    );
+
+const closeProjectDialogBtn =
+    document.getElementById(
+        "closeProjectDialogBtn"
+    );
+
+
+/* =========================
+   VIEW ELEMENTS
+========================= */
+
+const listViewBtn =
+    document.getElementById(
+        "listViewBtn"
+    );
+
+const boardViewBtn =
+    document.getElementById(
+        "boardViewBtn"
+    );
+
+const listView =
+    document.getElementById(
+        "listView"
+    );
+
+const boardView =
+    document.getElementById(
+        "boardView"
+    );
+
+
+/* =========================
+   DETAIL ELEMENTS
+========================= */
+
+const taskDetailDialog =
+    document.getElementById(
+        "taskDetailDialog"
+    );
+
+const detailTaskTitle =
+    document.getElementById(
+        "detailTaskTitle"
+    );
+
+const closeDetailBtn =
+    document.getElementById(
+        "closeDetailBtn"
+    );
+
+const detailDescription =
+    document.getElementById(
+        "detailDescription"
+    );
+
+let detailStatus =
+    document.getElementById(
+        "detailStatus"
+    );
+
+let detailPriority =
+    document.getElementById(
+        "detailPriority"
+    );
+
+const detailDueDate =
+    document.getElementById(
+        "detailDueDate"
+    );
+
+let detailCategory =
+    document.getElementById(
+        "detailCategory"
+    );
+
+const taskNotes =
+    document.getElementById(
+        "taskNotes"
+    );
+
+const saveNotesBtn =
+    document.getElementById(
+        "saveNotesBtn"
+    );
+
+const subtaskInput =
+    document.getElementById(
+        "subtaskInput"
+    );
+
+const addSubtaskBtn =
+    document.getElementById(
+        "addSubtaskBtn"
+    );
+
+const subtaskList =
+    document.getElementById(
+        "subtaskList"
+    );
+
+
+/* =========================
+   AUTH UI SETUP
+========================= */
+
+if (currentUserLabel) {
+
+    currentUserLabel.textContent =
+        currentUser;
 }
 
 
-// =====================================================
-// OPEN APPLICATION
-// =====================================================
+if (logoutBtn) {
 
-function openApplication(user) {
+    logoutBtn.addEventListener(
+        "click",
+        () => {
 
-    currentUser = user;
+            logoutUser();
 
-    show(authScreen, false);
-    show(appScreen, true);
+            window.location.href =
+                "login.html";
+        }
+    );
+}
 
-    if (welcomeMessage) {
-        welcomeMessage.textContent =
-            `Welcome, ${user.name}`;
+
+if (
+    adminDashboardLink &&
+    getCurrentUserRole() === "admin"
+) {
+
+    adminDashboardLink.hidden = false;
+}
+
+
+/* =========================
+   MAKE DETAIL CONTROLS
+   CLICKABLE
+========================= */
+
+/*
+   If detailStatus / priority / category
+   are normal text elements instead of
+   <select>, convert them into dropdowns.
+*/
+
+function ensureSelect(
+    element,
+    options,
+    defaultValue
+) {
+
+    if (!element) {
+        return null;
     }
 
-    if (currentUserRole) {
-        currentUserRole.textContent =
-            isAdmin(user) ? "Master Admin" : "User";
+
+    if (
+        element.tagName.toLowerCase() ===
+        "select"
+    ) {
+
+        return element;
     }
 
-    if (isAdmin(user)) {
 
-        show(adminDashboard, true);
-        show(userTaskManager, false);
+    const select =
+        document.createElement("select");
 
-        loadAdminDashboard();
+
+    select.id =
+        element.id;
+
+
+    select.className =
+        element.className;
+
+
+    options.forEach(optionValue => {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            optionValue;
+
+        option.textContent =
+            optionValue;
+
+        select.appendChild(
+            option
+        );
+
+    });
+
+
+    select.value =
+        defaultValue;
+
+
+    element.replaceWith(select);
+
+
+    return select;
+}
+
+
+/* STATUS */
+
+detailStatus =
+    ensureSelect(
+        detailStatus,
+        [
+            "To Do",
+            "In Progress",
+            "In Review",
+            "Done"
+        ],
+        "To Do"
+    );
+
+
+/* PRIORITY */
+
+detailPriority =
+    ensureSelect(
+        detailPriority,
+        [
+            "Low",
+            "Normal",
+            "High"
+        ],
+        "Normal"
+    );
+
+
+/* CATEGORY */
+
+detailCategory =
+    ensureSelect(
+        detailCategory,
+        [
+            "Work",
+            "Personal",
+            "Urgent"
+        ],
+        "Work"
+    );
+
+
+/* =========================
+   INITIAL UI
+========================= */
+
+updateUI();
+
+
+/* =========================
+   ADD TASK
+========================= */
+
+function addTask(
+    text,
+    category,
+    status
+) {
+
+    const newTask = {
+
+        id:
+            crypto.randomUUID(),
+
+        projectId:
+            activeProjectId,
+
+        text:
+            text,
+
+        category:
+            category,
+
+        status:
+            status,
+
+        done:
+            status === "Done",
+
+        description:
+            "",
+
+        dueDate:
+            "",
+
+        priority:
+            "Normal",
+
+        notes:
+            "",
+
+        subtasks:
+            [],
+
+        createdAt:
+            Date.now()
+    };
+
+
+    tasks.push(newTask);
+
+    saveTasks(tasks);
+
+    updateUI();
+
+    taskInput.value = "";
+
+    taskInput.focus();
+}
+
+
+/* =========================
+   ADD TASK BUTTON
+========================= */
+
+addTaskBtn.addEventListener(
+    "click",
+    () => {
+
+        const text =
+            taskInput.value.trim();
+
+        const category =
+            categorySelect.value;
+
+        const status =
+            statusSelect.value;
+
+
+        if (text === "") {
+
+            taskInput.focus();
+
+            return;
+        }
+
+
+        addTask(
+            text,
+            category,
+            status
+        );
+    }
+);
+
+
+/* =========================
+   ENTER KEY - ADD TASK
+========================= */
+
+taskInput.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+
+            event.preventDefault();
+
+            addTaskBtn.click();
+        }
+    }
+);
+
+
+/* =========================
+   PROJECT SWITCHING
+========================= */
+
+projectSwitcher.addEventListener(
+    "click",
+    event => {
+
+        const projectButton =
+            event.target.closest(
+                ".project-item"
+            );
+
+
+        if (!projectButton) {
+            return;
+        }
+
+
+        activeProjectId =
+            projectButton.dataset.projectId;
+
+
+        activeCategory =
+            "All";
+
+
+        filterButtons.forEach(
+            button => {
+
+                button.classList.remove(
+                    "active"
+                );
+
+
+                if (
+                    button.dataset.category ===
+                    "All"
+                ) {
+
+                    button.classList.add(
+                        "active"
+                    );
+                }
+
+            }
+        );
+
+
+        searchInput.value = "";
+
+        searchText = "";
+
+
+        updateUI();
+    }
+);
+
+
+/* =========================
+   NEW PROJECT DIALOG
+========================= */
+
+newProjectBtn.addEventListener(
+    "click",
+    () => {
+
+        projectNameInput.value = "";
+
+        newProjectDialog.showModal();
+
+        projectNameInput.focus();
+    }
+);
+
+
+/* =========================
+   CREATE PROJECT
+========================= */
+
+createProjectBtn.addEventListener(
+    "click",
+    () => {
+
+        const name =
+            projectNameInput.value.trim();
+
+
+        if (name === "") {
+
+            projectNameInput.focus();
+
+            return;
+        }
+
+
+        const newProject = {
+
+            id:
+                crypto.randomUUID(),
+
+            name:
+                name
+        };
+
+
+        projects.push(newProject);
+
+        saveProjects(projects);
+
+
+        activeProjectId =
+            newProject.id;
+
+
+        newProjectDialog.close();
+
+        updateUI();
+    }
+);
+
+
+/* =========================
+   CREATE PROJECT ENTER
+========================= */
+
+projectNameInput.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+
+            event.preventDefault();
+
+            createProjectBtn.click();
+        }
+    }
+);
+
+
+/* =========================
+   CANCEL PROJECT
+========================= */
+
+cancelProjectBtn.addEventListener(
+    "click",
+    () => {
+
+        newProjectDialog.close();
+    }
+);
+
+
+/* =========================
+   CLOSE PROJECT DIALOG
+========================= */
+
+closeProjectDialogBtn.addEventListener(
+    "click",
+    () => {
+
+        newProjectDialog.close();
+    }
+);
+
+
+/* =========================
+   CATEGORY FILTER
+========================= */
+
+filterButtons.forEach(
+    button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                activeCategory =
+                    button.dataset.category;
+
+
+                filterButtons.forEach(
+                    btn => {
+
+                        btn.classList.remove(
+                            "active"
+                        );
+                    }
+                );
+
+
+                button.classList.add(
+                    "active"
+                );
+
+
+                updateUI();
+            }
+        );
+    }
+);
+
+
+/* =========================
+   LIVE SEARCH
+========================= */
+
+searchInput.addEventListener(
+    "input",
+    () => {
+
+        searchText =
+            searchInput.value
+                .toLowerCase()
+                .trim();
+
+
+        updateUI();
+    }
+);
+
+
+/* =========================
+   SORT
+========================= */
+
+sortSelect.addEventListener(
+    "change",
+    () => {
+
+        updateUI();
+    }
+);
+
+
+/* =========================
+   VIEW TOGGLE
+========================= */
+
+listViewBtn.addEventListener(
+    "click",
+    () => {
+
+        currentView = "list";
+
+        updateViewButtons();
+
+        updateUI();
+    }
+);
+
+
+boardViewBtn.addEventListener(
+    "click",
+    () => {
+
+        currentView = "board";
+
+        updateViewButtons();
+
+        updateUI();
+    }
+);
+
+
+function updateViewButtons() {
+
+    listViewBtn.classList.toggle(
+        "active",
+        currentView === "list"
+    );
+
+
+    boardViewBtn.classList.toggle(
+        "active",
+        currentView === "board"
+    );
+
+
+    listView.hidden =
+        currentView !== "list";
+
+
+    boardView.hidden =
+        currentView !== "board";
+}
+
+
+/* =========================
+   GET PROJECT TASKS
+========================= */
+
+function getProjectTasks() {
+
+    return tasks.filter(
+        task =>
+            task.projectId ===
+            activeProjectId
+    );
+}
+
+
+/* =========================
+   GET VISIBLE TASKS
+========================= */
+
+function getVisibleTasks() {
+
+    let visibleTasks =
+        getProjectTasks();
+
+
+    /* CATEGORY FILTER */
+
+    if (
+        activeCategory !== "All"
+    ) {
+
+        visibleTasks =
+            visibleTasks.filter(
+                task =>
+                    task.category ===
+                    activeCategory
+            );
+    }
+
+
+    /* SEARCH */
+
+    if (searchText !== "") {
+
+        visibleTasks =
+            visibleTasks.filter(
+                task =>
+                    String(
+                        task.text || ""
+                    )
+                    .toLowerCase()
+                    .includes(searchText)
+            );
+    }
+
+
+    /* SORT */
+
+    if (
+        sortSelect.value === "az"
+    ) {
+
+        visibleTasks.sort(
+            (a, b) =>
+                String(a.text || "")
+                    .localeCompare(
+                        String(b.text || "")
+                    )
+        );
 
     } else {
 
-        show(adminDashboard, false);
-        show(userTaskManager, true);
-
-        loadUserDashboard();
+        visibleTasks.sort(
+            (a, b) =>
+                (b.createdAt || 0) -
+                (a.createdAt || 0)
+        );
     }
+
+
+    return visibleTasks;
 }
 
 
-// =====================================================
-// USER DASHBOARD
-// =====================================================
+/* =========================
+   UPDATE UI
+========================= */
 
-function loadUserDashboard() {
+function updateUI() {
 
-    if (!currentUser) {
-        return;
-    }
-
-    const defaultProject =
-        ensureDefaultProject(currentUser.id);
-
-    projects = loadProjects(currentUser.id);
-
-    if (!projects || projects.length === 0) {
-
-        if (defaultProject) {
-            projects = [defaultProject];
-        } else {
-            projects = [];
-        }
-    }
-
-    tasks = loadTasks(currentUser.id);
-
-    if (!activeProjectId ||
-        !projects.some(
-            project =>
-                String(project.id) ===
-                String(activeProjectId)
-        )
-    ) {
-
-        activeProjectId =
-            projects[0]?.id || "";
-    }
-
-    renderUserInterface();
-}
+    const visibleTasks =
+        getVisibleTasks();
 
 
-// =====================================================
-// USER INTERFACE
-// =====================================================
+    const projectTasks =
+        getProjectTasks();
 
-function renderUserInterface() {
-
-    renderProjects(
-        projectSwitcher,
-        projects,
-        activeProjectId
-    );
 
     const activeProject =
         projects.find(
             project =>
-                String(project.id) ===
-                String(activeProjectId)
+                project.id ===
+                activeProjectId
         );
 
-    if (activeProjectName) {
 
-        activeProjectName.textContent =
-            activeProject?.name || "My Tasks";
-    }
+    /* PROJECTS */
 
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// FILTER TASKS
-// =====================================================
-
-function getFilteredTasks() {
-
-    let result = [...tasks];
-
-    if (activeProjectId) {
-
-        result = result.filter(
-            task =>
-                String(task.projectId || "") ===
-                String(activeProjectId)
-        );
-    }
-
-    if (
-        currentCategory &&
-        currentCategory !== "all"
-    ) {
-
-        result = result.filter(
-            task =>
-                String(task.category || "")
-                    .toLowerCase() ===
-                currentCategory.toLowerCase()
-        );
-    }
-
-    if (currentSearch) {
-
-        const search =
-            currentSearch.toLowerCase();
-
-        result = result.filter(task => {
-
-            const title =
-                String(task.title || "")
-                    .toLowerCase();
-
-            const description =
-                String(task.description || "")
-                    .toLowerCase();
-
-            const category =
-                String(task.category || "")
-                    .toLowerCase();
-
-            return (
-                title.includes(search) ||
-                description.includes(search) ||
-                category.includes(search)
-            );
-        });
-    }
-
-    result.sort((a, b) => {
-
-        if (currentSort === "oldest") {
-
-            return (
-                new Date(a.createdAt || 0) -
-                new Date(b.createdAt || 0)
-            );
-        }
-
-        if (currentSort === "az") {
-
-            return String(a.title || "")
-                .localeCompare(
-                    String(b.title || "")
-                );
-        }
-
-        if (currentSort === "za") {
-
-            return String(b.title || "")
-                .localeCompare(
-                    String(a.title || "")
-                );
-        }
-
-        if (currentSort === "priority") {
-
-            const priorityMap = {
-                High: 3,
-                Medium: 2,
-                Low: 1
-            };
-
-            return (
-                (priorityMap[b.priority] || 0) -
-                (priorityMap[a.priority] || 0)
-            );
-        }
-
-        if (currentSort === "dueDate") {
-
-            const aDate =
-                a.dueDate
-                    ? new Date(a.dueDate).getTime()
-                    : Number.MAX_SAFE_INTEGER;
-
-            const bDate =
-                b.dueDate
-                    ? new Date(b.dueDate).getTime()
-                    : Number.MAX_SAFE_INTEGER;
-
-            return aDate - bDate;
-        }
-
-        return (
-            new Date(b.createdAt || 0) -
-            new Date(a.createdAt || 0)
-        );
-    });
-
-    return result;
-}
+    renderProjects(
+        projects,
+        activeProjectId
+    );
 
 
-// =====================================================
-// REFRESH USER TASK UI
-// =====================================================
-
-function refreshTaskUI() {
-
-    const filteredTasks =
-        getFilteredTasks();
+    /* LIST */
 
     renderTasks(
-        taskList,
-        filteredTasks
+        visibleTasks
     );
 
-    renderEmptyState(
-        emptyState,
-        filteredTasks
-    );
 
-    const projectTasks =
-        activeProjectId
-            ? tasks.filter(
-                task =>
-                    String(task.projectId || "") ===
-                    String(activeProjectId)
-            )
-            : [];
-
-    renderProgress(
-        progressText,
-        progressFill,
-        progressPercentage,
-        projectTasks
-    );
+    /* BOARD */
 
     renderBoard(
-        projectTasks,
-        {
-            todo: todoColumn,
-            inProgress: inProgressColumn,
-            inReview: inReviewColumn,
-            done: doneColumn
-        }
+        visibleTasks
     );
 
-    updateKanbanCounts(projectTasks);
 
-    attachDragAndDrop();
-}
+    /* PROGRESS */
 
+    if (activeProject) {
 
-// =====================================================
-// KANBAN COUNTS
-// =====================================================
-
-function updateKanbanCounts(projectTasks) {
-
-    const columns = [
-        {
-            element: todoColumn,
-            status: "To Do"
-        },
-        {
-            element: inProgressColumn,
-            status: "In Progress"
-        },
-        {
-            element: inReviewColumn,
-            status: "In Review"
-        },
-        {
-            element: doneColumn,
-            status: "Done"
-        }
-    ];
-
-    columns.forEach(({ element, status }) => {
-
-        if (!element) return;
-
-        const count =
-            projectTasks.filter(
-                task =>
-                    normalizeStatus(task.status) ===
-                    status
-            ).length;
-
-        const countElement =
-            element.querySelector(
-                ".column-count"
-            );
-
-        if (countElement) {
-            countElement.textContent = count;
-        }
-    });
-}
-
-
-// =====================================================
-// ADD TASK
-// =====================================================
-
-function handleAddTask() {
-
-    if (!currentUser) {
-        return;
-    }
-
-    const title =
-        taskInput?.value.trim();
-
-    if (!title) {
-
-        taskInput?.focus();
-
-        return;
-    }
-
-    if (!activeProjectId) {
-
-        alert(
-            "Please create or select a project first."
+        renderProgress(
+            activeProject,
+            projectTasks
         );
-
-        return;
     }
 
-    const newTask =
-        createTask(
-            currentUser.id,
-            {
-                title,
-                description: "",
-                category:
-                    categorySelect?.value ||
-                    "Work",
-                status:
-                    normalizeStatus(
-                        statusSelect?.value ||
-                        "To Do"
-                    ),
-                priority: "Medium",
-                dueDate: "",
-                projectId: activeProjectId
-            }
-        );
 
-    if (!newTask) {
-        return;
-    }
+    /* VIEW */
 
-    tasks = loadTasks(currentUser.id);
-
-    if (taskInput) {
-        taskInput.value = "";
-        taskInput.focus();
-    }
-
-    refreshTaskUI();
-}
+    updateViewButtons();
 
 
-// =====================================================
-// PROJECT SWITCH
-// =====================================================
-
-function handleProjectSwitch(event) {
-
-    const button =
-        event.target.closest(
-            "[data-project-id]"
-        );
-
-    if (!button) {
-        return;
-    }
-
-    const projectId =
-        button.dataset.projectId;
-
-    if (!projectId) {
-        return;
-    }
-
-    activeProjectId = projectId;
-
-    renderUserInterface();
-}
-
-
-// =====================================================
-// NEW PROJECT
-// =====================================================
-
-function openNewProjectDialog() {
-
-    if (!newProjectDialog) {
-        return;
-    }
-
-    if (projectError) {
-        projectError.textContent = "";
-    }
-
-    if (projectNameInput) {
-        projectNameInput.value = "";
-    }
-
-    newProjectDialog.showModal();
-
-    projectNameInput?.focus();
-}
-
-function closeNewProjectDialog() {
+    /* DRAG & DROP */
 
     if (
-        newProjectDialog &&
-        newProjectDialog.open
+        currentView === "list"
     ) {
-        newProjectDialog.close();
+
+        setupListDragAndDrop();
+
+    } else {
+
+        setupBoardDragAndDrop();
     }
 }
 
-function handleCreateProject() {
 
-    if (!currentUser) {
-        return;
-    }
+/* =========================
+   LIST DRAG & DROP
+========================= */
 
-    const name =
-        projectNameInput?.value.trim();
+function setupListDragAndDrop() {
 
-    if (!name) {
-
-        if (projectError) {
-            projectError.textContent =
-                "Please enter a project name.";
-        }
-
-        return;
-    }
-
-    const duplicate =
-        projects.some(
-            project =>
-                String(project.name || "")
-                    .trim()
-                    .toLowerCase() ===
-                name.toLowerCase()
+    const taskItems =
+        document.querySelectorAll(
+            ".task-item"
         );
 
-    if (duplicate) {
 
-        if (projectError) {
-            projectError.textContent =
-                "A project with this name already exists.";
+    taskItems.forEach(
+        item => {
+
+            item.addEventListener(
+                "dragstart",
+                event => {
+
+                    draggedTaskId =
+                        item.dataset.id ||
+                        item.dataset.taskId;
+
+
+                    item.classList.add(
+                        "dragging"
+                    );
+
+
+                    event.dataTransfer.effectAllowed =
+                        "move";
+
+
+                    event.dataTransfer.setData(
+                        "text/plain",
+                        draggedTaskId
+                    );
+                }
+            );
+
+
+            item.addEventListener(
+                "dragend",
+                () => {
+
+                    item.classList.remove(
+                        "dragging"
+                    );
+
+
+                    draggedTaskId = null;
+                }
+            );
         }
-
-        return;
-    }
-
-    const project =
-        createProject(
-            currentUser.id,
-            name
-        );
-
-    if (!project) {
-        return;
-    }
-
-    projects = loadProjects(
-        currentUser.id
     );
 
-    activeProjectId = project.id;
 
-    closeNewProjectDialog();
+    taskList.addEventListener(
+        "dragover",
+        handleListDragOver
+    );
 
-    renderUserInterface();
+
+    taskList.addEventListener(
+        "drop",
+        handleListDrop
+    );
 }
 
 
-// =====================================================
-// TASK DETAIL
-// =====================================================
+function handleListDragOver(event) {
+
+    event.preventDefault();
+
+
+    const draggingItem =
+        document.querySelector(
+            ".task-item.dragging"
+        );
+
+
+    if (!draggingItem) {
+        return;
+    }
+
+
+    const taskItems = [
+        ...taskList.querySelectorAll(
+            ".task-item:not(.dragging)"
+        )
+    ];
+
+
+    let closestItem = null;
+
+    let closestOffset =
+        Number.NEGATIVE_INFINITY;
+
+
+    for (
+        const item of taskItems
+    ) {
+
+        const box =
+            item.getBoundingClientRect();
+
+
+        const offset =
+            event.clientY -
+            box.top -
+            box.height / 2;
+
+
+        if (
+            offset < 0 &&
+            offset > closestOffset
+        ) {
+
+            closestOffset =
+                offset;
+
+            closestItem =
+                item;
+        }
+    }
+
+
+    if (closestItem) {
+
+        taskList.insertBefore(
+            draggingItem,
+            closestItem
+        );
+
+    } else {
+
+        taskList.appendChild(
+            draggingItem
+        );
+    }
+}
+
+
+function handleListDrop(event) {
+
+    event.preventDefault();
+
+
+    const orderedIds = [
+        ...taskList.querySelectorAll(
+            ".task-item"
+        )
+    ].map(
+        item =>
+            item.dataset.id ||
+            item.dataset.taskId
+    );
+
+
+    const visibleSet =
+        new Set(orderedIds);
+
+
+    const projectTasks =
+        tasks.filter(
+            task =>
+                task.projectId ===
+                activeProjectId
+        );
+
+
+    const reorderedProjectTasks =
+        [];
+
+
+    orderedIds.forEach(id => {
+
+        const task =
+            projectTasks.find(
+                item =>
+                    item.id === id
+            );
+
+
+        if (task) {
+
+            reorderedProjectTasks.push(
+                task
+            );
+        }
+    });
+
+
+    projectTasks.forEach(
+        task => {
+
+            if (
+                !visibleSet.has(
+                    task.id
+                )
+            ) {
+
+                reorderedProjectTasks.push(
+                    task
+                );
+            }
+        }
+    );
+
+
+    const otherTasks =
+        tasks.filter(
+            task =>
+                task.projectId !==
+                activeProjectId
+        );
+
+
+    tasks = [
+        ...otherTasks,
+        ...reorderedProjectTasks
+    ];
+
+
+    saveTasks(tasks);
+
+    draggedTaskId = null;
+
+    updateUI();
+}
+
+
+/* =========================
+   BOARD DRAG & DROP
+========================= */
+
+function setupBoardDragAndDrop() {
+
+    const boardTasks =
+        document.querySelectorAll(
+            ".kanban-task"
+        );
+
+
+    const columns =
+        document.querySelectorAll(
+            ".kanban-tasks"
+        );
+
+
+    boardTasks.forEach(
+        card => {
+
+            card.addEventListener(
+                "dragstart",
+                event => {
+
+                    draggedTaskId =
+                        card.dataset.taskId ||
+                        card.dataset.id;
+
+
+                    card.classList.add(
+                        "dragging"
+                    );
+
+
+                    event.dataTransfer.effectAllowed =
+                        "move";
+
+
+                    event.dataTransfer.setData(
+                        "text/plain",
+                        draggedTaskId
+                    );
+                }
+            );
+
+
+            card.addEventListener(
+                "dragend",
+                () => {
+
+                    card.classList.remove(
+                        "dragging"
+                    );
+
+
+                    draggedTaskId = null;
+                }
+            );
+        }
+    );
+
+
+    columns.forEach(
+        column => {
+
+            column.addEventListener(
+                "dragover",
+                event => {
+
+                    event.preventDefault();
+
+                    column.classList.add(
+                        "drag-over"
+                    );
+                }
+            );
+
+
+            column.addEventListener(
+                "dragleave",
+                () => {
+
+                    column.classList.remove(
+                        "drag-over"
+                    );
+                }
+            );
+
+
+            column.addEventListener(
+                "drop",
+                event => {
+
+                    event.preventDefault();
+
+
+                    column.classList.remove(
+                        "drag-over"
+                    );
+
+
+                    const taskId =
+                        draggedTaskId ||
+                        event.dataTransfer.getData(
+                            "text/plain"
+                        );
+
+
+                    if (!taskId) {
+                        return;
+                    }
+
+
+                    const task =
+                        tasks.find(
+                            item =>
+                                item.id ===
+                                taskId
+                        );
+
+
+                    if (!task) {
+                        return;
+                    }
+
+
+                    let newStatus =
+                        "To Do";
+
+
+                    if (
+                        column.id ===
+                        "inProgressColumn"
+                    ) {
+
+                        newStatus =
+                            "In Progress";
+
+                    } else if (
+                        column.id ===
+                        "inReviewColumn"
+                    ) {
+
+                        newStatus =
+                            "In Review";
+
+                    } else if (
+                        column.id ===
+                        "doneColumn"
+                    ) {
+
+                        newStatus =
+                            "Done";
+                    }
+
+
+                    task.status =
+                        newStatus;
+
+
+                    task.done =
+                        newStatus ===
+                        "Done";
+
+
+                    saveTasks(tasks);
+
+                    draggedTaskId = null;
+
+                    updateUI();
+                }
+            );
+        }
+    );
+}
+
+
+/* =========================
+   OPEN TASK DETAIL
+========================= */
+
+document.addEventListener(
+    "click",
+    event => {
+
+        const taskCard =
+            event.target.closest(
+                ".task-item, .kanban-task"
+            );
+
+
+        if (!taskCard) {
+            return;
+        }
+
+
+        if (
+            event.target.closest(
+                ".delete-btn"
+            )
+        ) {
+            return;
+        }
+
+
+        const taskId =
+            taskCard.dataset.id ||
+            taskCard.dataset.taskId;
+
+
+        if (!taskId) {
+            return;
+        }
+
+
+        openTaskDetail(taskId);
+    }
+);
+
+
+/* =========================
+   OPEN DETAIL
+========================= */
 
 function openTaskDetail(taskId) {
 
     const task =
         tasks.find(
             item =>
-                String(item.id) ===
-                String(taskId)
+                item.id === taskId
         );
 
-    if (!task || !taskDetailDialog) {
+
+    if (!task) {
         return;
     }
 
-    selectedTaskId = task.id;
 
-    renderTaskDetail(
-        task,
-        {
-            detailTaskTitle,
-            detailDescription,
-            detailStatus,
-            detailPriority,
-            detailDueDate,
-            detailCategory,
-            taskNotes
-        }
-    );
+    activeDetailTaskId =
+        taskId;
+
+
+    renderTaskDetail(task);
+
 
     renderSubtasks(
-        subtaskList,
         task.subtasks || []
     );
+
 
     taskDetailDialog.showModal();
 }
 
-function closeTaskDetail() {
 
-    if (
-        taskDetailDialog &&
-        taskDetailDialog.open
-    ) {
-        taskDetailDialog.close();
-    }
+/* =========================
+   CLOSE DETAIL
+========================= */
 
-    selectedTaskId = null;
-}
-
-function handleSaveTaskDetails() {
-
-    if (!currentUser || !selectedTaskId) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                String(item.id) ===
-                String(selectedTaskId)
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const updatedTask = {
-        ...task,
-        description:
-            detailDescription?.value.trim() ||
-            "",
-        notes:
-            taskNotes?.value ||
-            task.notes ||
-            ""
-    };
-
-    const result =
-        updateTask(
-            currentUser.id,
-            selectedTaskId,
-            updatedTask
-        );
-
-    if (!result) {
-        return;
-    }
-
-    tasks = loadTasks(
-        currentUser.id
-    );
-
-    closeTaskDetail();
-
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// SUBTASK
-// =====================================================
-
-function handleAddSubtask() {
-
-    if (!currentUser || !selectedTaskId) {
-        return;
-    }
-
-    const text =
-        subtaskInput?.value.trim();
-
-    if (!text) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                String(item.id) ===
-                String(selectedTaskId)
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const subtasks =
-        Array.isArray(task.subtasks)
-            ? [...task.subtasks]
-            : [];
-
-    subtasks.push({
-        id:
-            `${Date.now()}-${Math.random()
-                .toString(36)
-                .slice(2, 8)}`,
-        title: text,
-        completed: false
-    });
-
-    const updated =
-        updateTask(
-            currentUser.id,
-            selectedTaskId,
-            {
-                ...task,
-                subtasks
-            }
-        );
-
-    if (!updated) {
-        return;
-    }
-
-    tasks = loadTasks(
-        currentUser.id
-    );
-
-    if (subtaskInput) {
-        subtaskInput.value = "";
-    }
-
-    renderSubtasks(
-        subtaskList,
-        subtasks
-    );
-}
-
-
-// =====================================================
-// TASK LIST ACTIONS
-// =====================================================
-
-function handleTaskListClick(event) {
-
-    const openButton =
-        event.target.closest(
-            "[data-open-task]"
-        );
-
-    if (openButton) {
-
-        openTaskDetail(
-            openButton.dataset.openTask
-        );
-
-        return;
-    }
-
-    const deleteButton =
-        event.target.closest(
-            "[data-delete-task]"
-        );
-
-    if (deleteButton) {
-
-        handleDeleteTask(
-            deleteButton.dataset.deleteTask
-        );
-    }
-}
-
-
-// =====================================================
-// DELETE TASK
-// =====================================================
-
-function handleDeleteTask(taskId) {
-
-    if (!currentUser) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                String(item.id) ===
-                String(taskId)
-        );
-
-    if (!task) {
-        return;
-    }
-
-    deletedTaskBackup = {
-        ...task
-    };
-
-    const result =
-        deleteTask(
-            currentUser.id,
-            taskId
-        );
-
-    if (!result) {
-        deletedTaskBackup = null;
-        return;
-    }
-
-    tasks = loadTasks(
-        currentUser.id
-    );
-
-    showUndoToast(
-        `Task "${task.title}" deleted.`
-    );
-
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// UNDO DELETE
-// =====================================================
-
-function showUndoToast(message) {
-
-    if (undoMessage) {
-        undoMessage.textContent = message;
-    }
-
-    show(undoToast, true);
-
-    clearTimeout(undoTimer);
-
-    undoTimer =
-        setTimeout(() => {
-
-            deletedTaskBackup = null;
-
-            show(undoToast, false);
-
-        }, 5000);
-}
-
-function handleUndoDelete() {
-
-    if (!currentUser || !deletedTaskBackup) {
-        return;
-    }
-
-    const restored =
-        undoDeleteTask(
-            currentUser.id,
-            deletedTaskBackup
-        );
-
-    if (restored) {
-
-        tasks = loadTasks(
-            currentUser.id
-        );
-
-        deletedTaskBackup = null;
-
-        clearTimeout(undoTimer);
-
-        show(undoToast, false);
-
-        refreshTaskUI();
-    }
-}
-
-
-// =====================================================
-// VIEW SWITCH
-// =====================================================
-
-function switchView(view) {
-
-    currentView = view;
-
-    if (view === "board") {
-
-        show(taskListView, false);
-        show(kanbanBoard, true);
-
-        listViewBtn?.classList.remove("active");
-        boardViewBtn?.classList.add("active");
-
-    } else {
-
-        show(taskListView, true);
-        show(kanbanBoard, false);
-
-        listViewBtn?.classList.add("active");
-        boardViewBtn?.classList.remove("active");
-    }
-}
-
-
-// =====================================================
-// CATEGORY FILTER
-// =====================================================
-
-function handleCategoryFilter(event) {
-
-    const button =
-        event.target.closest(
-            "[data-category]"
-        );
-
-    if (!button) {
-        return;
-    }
-
-    const category =
-        button.dataset.category;
-
-    if (!category) {
-        return;
-    }
-
-    currentCategory =
-        category.toLowerCase();
-
-    document
-        .querySelectorAll(
-            ".filter-btn[data-category]"
-        )
-        .forEach(btn => {
-
-            btn.classList.toggle(
-                "active",
-                btn === button
-            );
-        });
-
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// SEARCH
-// =====================================================
-
-function handleSearch(event) {
-
-    currentSearch =
-        event.target.value.trim();
-
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// SORT
-// =====================================================
-
-function handleSort(event) {
-
-    currentSort =
-        event.target.value;
-
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// DRAG & DROP - USER
-// =====================================================
-
-function attachDragAndDrop() {
-
-    const columns =
-        document.querySelectorAll(
-            "#kanbanBoard .kanban-column"
-        );
-
-    columns.forEach(column => {
-
-        column.ondragover = event => {
-            event.preventDefault();
-        };
-
-        column.ondrop = event => {
-
-            event.preventDefault();
-
-            const taskId =
-                event.dataTransfer
-                    ?.getData("text/plain");
-
-            const newStatus =
-                column.dataset.status;
-
-            if (!taskId || !newStatus) {
-                return;
-            }
-
-            updateTaskStatus(
-                taskId,
-                newStatus
-            );
-        };
-    });
-}
-
-
-// =====================================================
-// UPDATE USER TASK STATUS
-// =====================================================
-
-function updateTaskStatus(
-    taskId,
-    newStatus
-) {
-
-    if (!currentUser) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            item =>
-                String(item.id) ===
-                String(taskId)
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const result =
-        updateTask(
-            currentUser.id,
-            taskId,
-            {
-                ...task,
-                status:
-                    normalizeStatus(newStatus)
-            }
-        );
-
-    if (!result) {
-        return;
-    }
-
-    tasks = loadTasks(
-        currentUser.id
-    );
-
-    refreshTaskUI();
-}
-
-
-// =====================================================
-// TASK DETAIL SUBTASK CLICK
-// =====================================================
-
-function handleSubtaskClick(event) {
-
-    const item =
-        event.target.closest(
-            "[data-subtask-id]"
-        );
-
-    if (!item || !selectedTaskId) {
-        return;
-    }
-
-    if (!event.target.matches(
-        'input[type="checkbox"]'
-    )) {
-        return;
-    }
-
-    const task =
-        tasks.find(
-            currentTask =>
-                String(currentTask.id) ===
-                String(selectedTaskId)
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const subtasks =
-        Array.isArray(task.subtasks)
-            ? [...task.subtasks]
-            : [];
-
-    const subtask =
-        subtasks.find(
-            sub =>
-                String(sub.id) ===
-                String(
-                    item.dataset.subtaskId
-                )
-        );
-
-    if (!subtask) {
-        return;
-    }
-
-    subtask.completed =
-        event.target.checked;
-
-    updateTask(
-        currentUser.id,
-        selectedTaskId,
-        {
-            ...task,
-            subtasks
-        }
-    );
-
-    tasks = loadTasks(
-        currentUser.id
-    );
-
-    renderSubtasks(
-        subtaskList,
-        subtasks
-    );
-}
-
-
-// =====================================================
-// EXPORT
-// =====================================================
-
-function handleExport() {
-
-    if (!currentUser) {
-        return;
-    }
-
-    const data =
-        getUserDataForExport(
-            currentUser.id
-        );
-
-    if (!data) {
-        return;
-    }
-
-    const blob =
-        new Blob(
-            [JSON.stringify(data, null, 2)],
-            {
-                type: "application/json"
-            }
-        );
-
-    const url =
-        URL.createObjectURL(blob);
-
-    const anchor =
-        document.createElement("a");
-
-    anchor.href = url;
-
-    anchor.download =
-        `task-manager-${currentUser.name
-            .replace(/\s+/g, "-")
-            .toLowerCase()}.json`;
-
-    document.body.appendChild(anchor);
-
-    anchor.click();
-
-    anchor.remove();
-
-    URL.revokeObjectURL(url);
-}
-
-
-// =====================================================
-// IMPORT
-// =====================================================
-
-function handleImport(event) {
-
-    if (!currentUser) {
-        return;
-    }
-
-    const file =
-        event.target.files?.[0];
-
-    if (!file) {
-        return;
-    }
-
-    const reader =
-        new FileReader();
-
-    reader.onload = () => {
-
-        try {
-
-            const importedData =
-                JSON.parse(
-                    reader.result
-                );
-
-            const result =
-                importUserData(
-                    currentUser.id,
-                    importedData
-                );
-
-            if (!result) {
-
-                alert(
-                    "Unable to import tasks."
-                );
-
-                return;
-            }
-
-            projects =
-                loadProjects(
-                    currentUser.id
-                );
-
-            tasks =
-                loadTasks(
-                    currentUser.id
-                );
-
-            if (!projects.some(
-                project =>
-                    String(project.id) ===
-                    String(activeProjectId)
-            )) {
-
-                activeProjectId =
-                    projects[0]?.id || "";
-            }
-
-            renderUserInterface();
-
-            alert(
-                "Tasks imported successfully."
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Import error:",
-                error
-            );
-
-            alert(
-                "Invalid JSON file."
-            );
-        }
-
-        event.target.value = "";
-    };
-
-    reader.readAsText(file);
-}
-
-
-// =====================================================
-// ADMIN DASHBOARD
-// =====================================================
-
-function loadAdminDashboard() {
-
-    if (!currentUser || !isAdmin(currentUser)) {
-        return;
-    }
-
-    const users =
-        loadUsers();
-
-    const regularUsers =
-        users.filter(
-            user =>
-                user.role !== "admin"
-        );
-
-    let allTasks = [];
-
-    regularUsers.forEach(user => {
-
-        const userTasks =
-            loadTasks(user.id);
-
-        allTasks.push(
-            ...userTasks.map(task => ({
-                ...task,
-                userId:
-                    task.userId ||
-                    user.id,
-                userName:
-                    user.name,
-                userEmail:
-                    user.email
-            }))
-        );
-    });
-
-
-    // SUMMARY
-
-    renderAdminSummary(
-        {
-            totalUsers:
-                adminTotalUsers,
-
-            totalTasks:
-                adminTotalTasks,
-
-            pendingTasks:
-                adminPendingTasks,
-
-            completedTasks:
-                adminCompletedTasks
-        },
-        regularUsers,
-        allTasks
-    );
-
-
-    // USERS
-
-    renderAdminUsers(
-        adminUsersList,
-        regularUsers,
-        allTasks
-    );
-
-
-    // REPORTS
-
-    renderAdminReports(
-        adminReportsList,
-        regularUsers,
-        allTasks
-    );
-
-
-    // USER SELECT
-
-    renderUserSelect(
-        adminUserSelect,
-        regularUsers
-    );
-
-
-    // ADMIN BOARD
-
-    const grouped = {
-        todo: allTasks.filter(
-            task =>
-                normalizeStatus(task.status) ===
-                "To Do"
-        ),
-
-        inProgress: allTasks.filter(
-            task =>
-                normalizeStatus(task.status) ===
-                "In Progress"
-        ),
-
-        inReview: allTasks.filter(
-            task =>
-                normalizeStatus(task.status) ===
-                "In Review"
-        ),
-
-        done: allTasks.filter(
-            task =>
-                normalizeStatus(task.status) ===
-                "Done"
-        )
-    };
-
-    renderAdminBoard(
-        {
-            todo: adminTodoColumn,
-            inProgress: adminInProgressColumn,
-            inReview: adminInReviewColumn,
-            done: adminDoneColumn
-        },
-        allTasks,
-        regularUsers
-    );
-
-    updateAdminBoardCounts(
-        allTasks
-    );
-
-    populateAdminProjects();
-
-    attachAdminDragAndDrop();
-}
-
-
-// =====================================================
-// ADMIN PROJECT SELECT
-// =====================================================
-
-function populateAdminProjects() {
-
-    if (!adminTaskProject) {
-        return;
-    }
-
-    const selectedUserId =
-        adminUserSelect?.value;
-
-    adminTaskProject.innerHTML = "";
-
-    const noProjectOption =
-        document.createElement("option");
-
-    noProjectOption.value = "";
-
-    noProjectOption.textContent =
-        "No Project";
-
-    adminTaskProject.appendChild(
-        noProjectOption
-    );
-
-    if (!selectedUserId) {
-        return;
-    }
-
-    const userProjects =
-        loadProjects(
-            selectedUserId
-        );
-
-    userProjects.forEach(project => {
-
-        const option =
-            document.createElement("option");
-
-        option.value =
-            project.id;
-
-        option.textContent =
-            project.name;
-
-        adminTaskProject.appendChild(
-            option
-        );
-    });
-}
-
-
-// =====================================================
-// ADMIN USER CHANGE
-// =====================================================
-
-function handleAdminUserChange() {
-    populateAdminProjects();
-}
-
-
-// =====================================================
-// ADMIN ASSIGN TASK
-// =====================================================
-
-function handleAdminAssignTask(event) {
-
-    event.preventDefault();
-
-    if (!currentUser || !isAdmin(currentUser)) {
-        return;
-    }
-
-    const userId =
-        adminUserSelect?.value;
-
-    const title =
-        adminTaskTitle?.value.trim();
-
-    if (!userId) {
-
-        showAdminMessage(
-            "Please select a user.",
-            true
-        );
-
-        return;
-    }
-
-    if (!title) {
-
-        showAdminMessage(
-            "Please enter a task title.",
-            true
-        );
-
-        return;
-    }
-
-    let projectId =
-        adminTaskProject?.value || "";
-
-    if (!projectId) {
-
-        const userProjects =
-            loadProjects(userId);
-
-        projectId =
-            userProjects[0]?.id || "";
-    }
-
-    const task =
-        createAssignedTask(
-            userId,
-            {
-                title,
-                description:
-                    adminTaskDescription?.value.trim() ||
-                    "",
-                category:
-                    adminTaskCategory?.value ||
-                    "Work",
-                priority:
-                    adminTaskPriority?.value ||
-                    "Medium",
-                dueDate:
-                    adminTaskDueDate?.value ||
-                    "",
-                status: "To Do",
-                projectId
-            }
-        );
-
-    if (!task) {
-
-        showAdminMessage(
-            "Unable to assign task.",
-            true
-        );
-
-        return;
-    }
-
-    showAdminMessage(
-        "Task assigned successfully.",
-        false
-    );
-
-    adminAssignTaskForm?.reset();
-
-    populateAdminProjects();
-
-    loadAdminDashboard();
-}
-
-
-// =====================================================
-// ADMIN MESSAGE
-// =====================================================
-
-function showAdminMessage(
-    message,
-    isError = false
-) {
-
-    if (!adminAssignMessage) {
-        return;
-    }
-
-    adminAssignMessage.textContent =
-        message;
-
-    adminAssignMessage.classList.toggle(
-        "error-message",
-        isError
-    );
-
-    adminAssignMessage.classList.toggle(
-        "success-message",
-        !isError
-    );
-
-    clearTimeout(
-        showAdminMessage.timer
-    );
-
-    showAdminMessage.timer =
-        setTimeout(() => {
-
-            if (adminAssignMessage) {
-                adminAssignMessage.textContent =
-                    "";
-            }
-
-        }, 4000);
-}
-
-
-// =====================================================
-// ADMIN BOARD COUNTS
-// =====================================================
-
-function updateAdminBoardCounts(
-    allTasks
-) {
-
-    const statusData = [
-        {
-            column: adminTodoColumn,
-            countElement: adminTodoTasks,
-            status: "To Do"
-        },
-        {
-            column: adminInProgressColumn,
-            countElement: adminInProgressTasks,
-            status: "In Progress"
-        },
-        {
-            column: adminInReviewColumn,
-            countElement: adminInReviewTasks,
-            status: "In Review"
-        },
-        {
-            column: adminDoneColumn,
-            countElement: adminDoneTasks,
-            status: "Done"
-        }
-    ];
-
-    statusData.forEach(item => {
-
-        const count =
-            allTasks.filter(
-                task =>
-                    normalizeStatus(task.status) ===
-                    item.status
-            ).length;
-
-        if (item.countElement) {
-            item.countElement.textContent =
-                count;
-        }
-
-        if (item.column) {
-
-            const columnCount =
-                item.column.querySelector(
-                    ".admin-column-count"
-                );
-
-            if (columnCount) {
-                columnCount.textContent =
-                    count;
-            }
-        }
-    });
-}
-
-
-// =====================================================
-// ADMIN DRAG & DROP
-// =====================================================
-
-function attachAdminDragAndDrop() {
-
-    const columns =
-        document.querySelectorAll(
-            "#adminDashboard .admin-board-column"
-        );
-
-    columns.forEach(column => {
-
-        column.ondragover = event => {
-            event.preventDefault();
-        };
-
-        column.ondrop = event => {
-
-            event.preventDefault();
-
-            const data =
-                event.dataTransfer
-                    ?.getData("text/plain");
-
-            if (!data) {
-                return;
-            }
-
-            let taskId = data;
-            let userId = "";
-
-            try {
-
-                const parsed =
-                    JSON.parse(data);
-
-                if (parsed) {
-
-                    taskId =
-                        parsed.taskId ||
-                        taskId;
-
-                    userId =
-                        parsed.userId ||
-                        "";
-                }
-
-            } catch {
-                // Plain task ID is also supported.
-            }
-
-            const status =
-                column.dataset.status;
-
-            if (!taskId || !status) {
-                return;
-            }
-
-            updateAdminTaskStatus(
-                taskId,
-                userId,
-                status
-            );
-        };
-    });
-}
-
-
-// =====================================================
-// UPDATE ADMIN TASK STATUS
-// =====================================================
-
-function updateAdminTaskStatus(
-    taskId,
-    userId,
-    newStatus
-) {
-
-    const users =
-        loadUsers();
-
-    const regularUsers =
-        users.filter(
-            user =>
-                user.role !== "admin"
-        );
-
-    let targetUser = null;
-
-    if (userId) {
-
-        targetUser =
-            regularUsers.find(
-                user =>
-                    String(user.id) ===
-                    String(userId)
-            );
-    }
-
-    if (!targetUser) {
-
-        for (const user of regularUsers) {
-
-            const userTasks =
-                loadTasks(user.id);
-
-            const found =
-                userTasks.find(
-                    task =>
-                        String(task.id) ===
-                        String(taskId)
-                );
-
-            if (found) {
-
-                targetUser = user;
-
-                break;
-            }
-        }
-    }
-
-    if (!targetUser) {
-        return;
-    }
-
-    const userTasks =
-        loadTasks(
-            targetUser.id
-        );
-
-    const task =
-        userTasks.find(
-            item =>
-                String(item.id) ===
-                String(taskId)
-        );
-
-    if (!task) {
-        return;
-    }
-
-    const updated =
-        updateTask(
-            targetUser.id,
-            taskId,
-            {
-                ...task,
-                status:
-                    normalizeStatus(
-                        newStatus
-                    )
-            }
-        );
-
-    if (!updated) {
-        return;
-    }
-
-    loadAdminDashboard();
-}
-
-
-// =====================================================
-// ADMIN REPORT REFRESH
-// =====================================================
-
-function refreshAdminDashboard() {
-    loadAdminDashboard();
-}
-
-
-// =====================================================
-// ADMIN OPEN TASK MANAGER
-// =====================================================
-
-function openUserTaskManager() {
-
-    if (!currentUser) {
-        return;
-    }
-
-    if (isAdmin(currentUser)) {
-        return;
-    }
-
-    show(adminDashboard, false);
-    show(userTaskManager, true);
-
-    loadUserDashboard();
-}
-
-
-// =====================================================
-// LOGOUT
-// =====================================================
-
-function handleLogout() {
-
-    clearCurrentUser();
-
-    currentUser = null;
-
-    tasks = [];
-    projects = [];
-
-    activeProjectId = "";
-
-    selectedTaskId = null;
-
-    deletedTaskBackup = null;
-
-    clearTimeout(undoTimer);
-
-    show(undoToast, false);
-
-    if (loginForm) {
-        loginForm.reset();
-    }
-
-    if (registerForm) {
-        registerForm.reset();
-    }
-
-    showAuthScreen();
-}
-
-
-// =====================================================
-// EVENT BINDING
-// =====================================================
-
-function bindAuthEvents() {
-
-    loginForm?.addEventListener(
-        "submit",
-        handleLogin
-    );
-
-    registerForm?.addEventListener(
-        "submit",
-        handleRegister
-    );
-
-    showRegisterBtn?.addEventListener(
-        "click",
-        showRegisterForm
-    );
-
-    showLoginBtn?.addEventListener(
-        "click",
-        showLoginForm
-    );
-}
-
-
-// =====================================================
-// APP EVENTS
-// =====================================================
-
-function bindAppEvents() {
-
-    logoutBtn?.addEventListener(
-        "click",
-        handleLogout
-    );
-
-    addTaskBtn?.addEventListener(
-        "click",
-        handleAddTask
-    );
-
-    taskInput?.addEventListener(
-        "keydown",
-        event => {
-
-            if (event.key === "Enter") {
-
-                event.preventDefault();
-
-                handleAddTask();
-            }
-        }
-    );
-
-    searchInput?.addEventListener(
-        "input",
-        handleSearch
-    );
-
-    sortSelect?.addEventListener(
-        "change",
-        handleSort
-    );
-
-    filterButtons.forEach(button => {
-
-        button.addEventListener(
-            "click",
-            handleCategoryFilter
-        );
-    });
-
-    listViewBtn?.addEventListener(
-        "click",
-        () => switchView("list")
-    );
-
-    boardViewBtn?.addEventListener(
-        "click",
-        () => switchView("board")
-    );
-
-    projectSwitcher?.addEventListener(
-        "click",
-        handleProjectSwitch
-    );
-
-    newProjectBtn?.addEventListener(
-        "click",
-        openNewProjectDialog
-    );
-
-    createProjectBtn?.addEventListener(
-        "click",
-        handleCreateProject
-    );
-
-    cancelProjectBtn?.addEventListener(
-        "click",
-        closeNewProjectDialog
-    );
-
-    closeNewProjectBtn?.addEventListener(
-        "click",
-        closeNewProjectDialog
-    );
-
-    projectNameInput?.addEventListener(
-        "keydown",
-        event => {
-
-            if (event.key === "Enter") {
-
-                event.preventDefault();
-
-                handleCreateProject();
-            }
-        }
-    );
-
-    taskList?.addEventListener(
-        "click",
-        handleTaskListClick
-    );
-
-    saveNotesBtn?.addEventListener(
-        "click",
-        handleSaveTaskDetails
-    );
-
-    closeTaskDetailBtn?.addEventListener(
-        "click",
-        closeTaskDetail
-    );
-
-    cancelTaskDetailBtn?.addEventListener(
-        "click",
-        closeTaskDetail
-    );
-
-    addSubtaskBtn?.addEventListener(
-        "click",
-        handleAddSubtask
-    );
-
-    subtaskInput?.addEventListener(
-        "keydown",
-        event => {
-
-            if (event.key === "Enter") {
-
-                event.preventDefault();
-
-                handleAddSubtask();
-            }
-        }
-    );
-
-    subtaskList?.addEventListener(
-        "change",
-        handleSubtaskClick
-    );
-
-    exportBtn?.addEventListener(
-        "click",
-        handleExport
-    );
-
-    importFileInput?.addEventListener(
-        "change",
-        handleImport
-    );
-
-    undoBtn?.addEventListener(
-        "click",
-        handleUndoDelete
-    );
-}
-
-
-// =====================================================
-// ADMIN EVENTS
-// =====================================================
-
-function bindAdminEvents() {
-
-    adminAssignTaskForm?.addEventListener(
-        "submit",
-        handleAdminAssignTask
-    );
-
-    adminUserSelect?.addEventListener(
-        "change",
-        handleAdminUserChange
-    );
-
-    refreshAdminReportsBtn?.addEventListener(
-        "click",
-        refreshAdminDashboard
-    );
-
-    adminOpenTaskManagerBtn?.addEventListener(
-        "click",
-        openUserTaskManager
-    );
-}
-
-
-// =====================================================
-// START APPLICATION
-// =====================================================
-
-document.addEventListener(
-    "DOMContentLoaded",
+closeDetailBtn.addEventListener(
+    "click",
     () => {
 
-        bindAuthEvents();
+        taskDetailDialog.close();
 
-        bindAppEvents();
+        activeDetailTaskId = null;
+    }
+);
 
-        bindAdminEvents();
 
-        const savedUser =
-            getCurrentUser();
+/* =========================
+   SAVE DETAIL CHANGES
+========================= */
 
-        if (savedUser) {
+function saveDetailChanges() {
 
-            currentUser =
-                savedUser;
+    if (!activeDetailTaskId) {
+        return;
+    }
 
-            openApplication(
-                savedUser
+
+    const task =
+        tasks.find(
+            item =>
+                item.id ===
+                activeDetailTaskId
+        );
+
+
+    if (!task) {
+        return;
+    }
+
+
+    /* DESCRIPTION */
+
+    if (detailDescription) {
+
+        task.description =
+            detailDescription.value ??
+            "";
+    }
+
+
+    /* STATUS */
+
+    if (detailStatus) {
+
+        task.status =
+            detailStatus.value;
+
+        task.done =
+            task.status === "Done";
+    }
+
+
+    /* PRIORITY */
+
+    if (detailPriority) {
+
+        task.priority =
+            detailPriority.value;
+    }
+
+
+    /* DUE DATE */
+
+    if (detailDueDate) {
+
+        task.dueDate =
+            detailDueDate.value;
+    }
+
+
+    /* CATEGORY */
+
+    if (detailCategory) {
+
+        task.category =
+            detailCategory.value;
+    }
+
+
+    /* NOTES */
+
+    if (taskNotes) {
+
+        task.notes =
+            taskNotes.value;
+    }
+
+
+    saveTasks(tasks);
+
+    updateUI();
+
+
+    /*
+       Re-render the open dialog
+       so the selected status stays visible.
+    */
+
+    if (
+        taskDetailDialog.open &&
+        activeDetailTaskId
+    ) {
+
+        renderTaskDetail(task);
+
+        renderSubtasks(
+            task.subtasks || []
+        );
+    }
+}
+
+
+/* =========================
+   DETAIL STATUS CHANGE
+========================= */
+
+detailStatus.addEventListener(
+    "change",
+    saveDetailChanges
+);
+
+
+/* =========================
+   DETAIL PRIORITY CHANGE
+========================= */
+
+detailPriority.addEventListener(
+    "change",
+    saveDetailChanges
+);
+
+
+/* =========================
+   DETAIL DUE DATE CHANGE
+========================= */
+
+detailDueDate.addEventListener(
+    "change",
+    saveDetailChanges
+);
+
+
+/* =========================
+   DETAIL CATEGORY CHANGE
+========================= */
+
+detailCategory.addEventListener(
+    "change",
+    saveDetailChanges
+);
+
+
+/* =========================
+   DETAIL DESCRIPTION CHANGE
+========================= */
+
+detailDescription.addEventListener(
+    "change",
+    saveDetailChanges
+);
+
+
+/* =========================
+   SAVE NOTES
+========================= */
+
+saveNotesBtn.addEventListener(
+    "click",
+    () => {
+
+        if (!activeDetailTaskId) {
+            return;
+        }
+
+
+        const task =
+            tasks.find(
+                item =>
+                    item.id ===
+                    activeDetailTaskId
             );
 
-        } else {
 
-            showAuthScreen();
+        if (!task) {
+            return;
+        }
+
+
+        task.notes =
+            taskNotes.value;
+
+
+        saveTasks(tasks);
+
+        updateUI();
+
+
+        /*
+           Keep detail dialog open
+           after saving notes.
+        */
+
+        if (
+            taskDetailDialog.open
+        ) {
+
+            renderTaskDetail(task);
+
+            renderSubtasks(
+                task.subtasks || []
+            );
+        }
+    }
+);
+
+
+/* =========================
+   ADD SUBTASK
+========================= */
+
+addSubtaskBtn.addEventListener(
+    "click",
+    addSubtask
+);
+
+
+subtaskInput.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+
+            event.preventDefault();
+
+            addSubtask();
+        }
+    }
+);
+
+
+function addSubtask() {
+
+    if (!activeDetailTaskId) {
+        return;
+    }
+
+
+    const text =
+        subtaskInput.value.trim();
+
+
+    if (text === "") {
+        return;
+    }
+
+
+    const task =
+        tasks.find(
+            item =>
+                item.id ===
+                activeDetailTaskId
+        );
+
+
+    if (!task) {
+        return;
+    }
+
+
+    if (!Array.isArray(task.subtasks)) {
+
+        task.subtasks = [];
+    }
+
+
+    task.subtasks.push({
+
+        id:
+            crypto.randomUUID(),
+
+        text:
+            text,
+
+        done:
+            false
+    });
+
+
+    saveTasks(tasks);
+
+
+    subtaskInput.value = "";
+
+
+    renderSubtasks(
+        task.subtasks
+    );
+}
+
+
+/* =========================
+   SUBTASK CHECK / DELETE
+========================= */
+
+subtaskList.addEventListener(
+    "click",
+    event => {
+
+        if (!activeDetailTaskId) {
+            return;
+        }
+
+
+        const task =
+            tasks.find(
+                item =>
+                    item.id ===
+                    activeDetailTaskId
+            );
+
+
+        if (!task) {
+            return;
+        }
+
+
+        const checkbox =
+            event.target.closest(
+                ".subtask-checkbox"
+            );
+
+
+        const deleteButton =
+            event.target.closest(
+                ".subtask-delete"
+            );
+
+
+        /* CHECK SUBTASK */
+
+        if (checkbox) {
+
+            const subtaskId =
+                checkbox.dataset.subtaskId;
+
+
+            const subtask =
+                task.subtasks.find(
+                    item =>
+                        item.id ===
+                        subtaskId
+                );
+
+
+            if (subtask) {
+
+                subtask.done =
+                    checkbox.checked;
+            }
+
+
+            saveTasks(tasks);
+
+
+            renderSubtasks(
+                task.subtasks
+            );
+
+
+            return;
+        }
+
+
+        /* DELETE SUBTASK */
+
+        if (deleteButton) {
+
+            const subtaskId =
+                deleteButton.dataset.subtaskId;
+
+
+            task.subtasks =
+                task.subtasks.filter(
+                    item =>
+                        item.id !==
+                        subtaskId
+                );
+
+
+            saveTasks(tasks);
+
+
+            renderSubtasks(
+                task.subtasks
+            );
+        }
+    }
+);
+
+
+/* =========================
+   DELETE TASK
+========================= */
+
+document.addEventListener(
+    "click",
+    event => {
+
+        if (
+            !event.target.classList.contains(
+                "delete-btn"
+            )
+        ) {
+            return;
+        }
+
+
+        const taskCard =
+            event.target.closest(
+                ".task-item, .kanban-task"
+            );
+
+
+        if (!taskCard) {
+            return;
+        }
+
+
+        const taskId =
+            taskCard.dataset.id ||
+            taskCard.dataset.taskId;
+
+
+        deleteTask(taskId);
+    }
+);
+
+
+/* =========================
+   DELETE FUNCTION
+========================= */
+
+function deleteTask(taskId) {
+
+    const originalIndex =
+        tasks.findIndex(
+            task =>
+                task.id === taskId
+        );
+
+
+    if (originalIndex === -1) {
+        return;
+    }
+
+
+    const removedTask =
+        tasks[originalIndex];
+
+
+    tasks =
+        tasks.filter(
+            task =>
+                task.id !== taskId
+        );
+
+
+    saveTasks(tasks);
+
+    updateUI();
+
+
+    showUndoToast(
+        removedTask,
+        originalIndex
+    );
+}
+
+
+/* =========================
+   UNDO
+========================= */
+
+function showUndoToast(
+    removedTask,
+    originalIndex
+) {
+
+    let undoUsed = false;
+
+
+    undoToast.hidden = false;
+
+
+    const timeoutId =
+        setTimeout(
+            () => {
+
+                undoToast.hidden = true;
+
+            },
+            5000
+        );
+
+
+    function undoDelete() {
+
+        if (undoUsed) {
+            return;
+        }
+
+
+        undoUsed = true;
+
+
+        clearTimeout(
+            timeoutId
+        );
+
+
+        tasks.splice(
+            originalIndex,
+            0,
+            removedTask
+        );
+
+
+        saveTasks(tasks);
+
+        updateUI();
+
+        undoToast.hidden = true;
+    }
+
+
+    undoBtn.onclick =
+        undoDelete;
+}
+
+
+/* =========================
+   EXPORT
+========================= */
+
+exportBtn.addEventListener(
+    "click",
+    () => {
+
+        const data = {
+
+            projects:
+                projects,
+
+            tasks:
+                tasks
+        };
+
+
+        const json =
+            JSON.stringify(
+                data,
+                null,
+                2
+            );
+
+
+        const blob =
+            new Blob(
+                [json],
+                {
+                    type:
+                        "application/json"
+                }
+            );
+
+
+        const url =
+            URL.createObjectURL(
+                blob
+            );
+
+
+        const link =
+            document.createElement(
+                "a"
+            );
+
+
+        link.href =
+            url;
+
+
+        link.download =
+            "tasks.json";
+
+
+        document.body.appendChild(
+            link
+        );
+
+
+        link.click();
+
+
+        link.remove();
+
+
+        URL.revokeObjectURL(
+            url
+        );
+    }
+);
+
+
+/* =========================
+   IMPORT
+========================= */
+
+importInput.addEventListener(
+    "change",
+    event => {
+
+        const file =
+            event.target.files[0];
+
+
+        if (!file) {
+            return;
+        }
+
+
+        const reader =
+            new FileReader();
+
+
+        reader.onload =
+            event => {
+
+                try {
+
+                    const importedData =
+                        JSON.parse(
+                            event.target.result
+                        );
+
+
+                    /* WEEK 3 FORMAT */
+
+                    if (
+                        importedData &&
+                        !Array.isArray(
+                            importedData
+                        ) &&
+                        Array.isArray(
+                            importedData.projects
+                        ) &&
+                        Array.isArray(
+                            importedData.tasks
+                        )
+                    ) {
+
+                        projects =
+                            importedData.projects;
+
+
+                        tasks =
+                            importedData.tasks;
+
+
+                        if (
+                            projects.length ===
+                            0
+                        ) {
+
+                            projects.push({
+
+                                id:
+                                    crypto.randomUUID(),
+
+                                name:
+                                    "My Project"
+                            });
+                        }
+
+
+                        activeProjectId =
+                            projects[0].id;
+                    }
+
+
+                    /* WEEK 2 FORMAT */
+
+                    else if (
+                        Array.isArray(
+                            importedData
+                        )
+                    ) {
+
+                        if (
+                            projects.length ===
+                            0
+                        ) {
+
+                            projects.push({
+
+                                id:
+                                    crypto.randomUUID(),
+
+                                name:
+                                    "My Project"
+                            });
+
+
+                            saveProjects(
+                                projects
+                            );
+                        }
+
+
+                        activeProjectId =
+                            projects[0].id;
+
+
+                        tasks =
+                            importedData;
+                    }
+
+
+                    else {
+
+                        throw new Error(
+                            "Invalid task data"
+                        );
+                    }
+
+
+                    /* NORMALIZE TASKS */
+
+                    tasks =
+                        tasks
+                            .filter(
+                                task =>
+                                    task &&
+                                    typeof task.text ===
+                                        "string"
+                            )
+                            .map(
+                                task => ({
+
+                                    id:
+                                        task.id ||
+                                        crypto.randomUUID(),
+
+                                    projectId:
+                                        task.projectId ||
+                                        activeProjectId,
+
+                                    text:
+                                        task.text,
+
+                                    category:
+                                        task.category ||
+                                        "Work",
+
+                                    status:
+                                        task.status ||
+                                        (
+                                            task.done
+                                                ? "Done"
+                                                : "To Do"
+                                        ),
+
+                                    done:
+                                        task.status ===
+                                            "Done" ||
+                                        Boolean(
+                                            task.done
+                                        ),
+
+                                    description:
+                                        task.description ||
+                                        "",
+
+                                    dueDate:
+                                        task.dueDate ||
+                                        "",
+
+                                    priority:
+                                        task.priority ||
+                                        "Normal",
+
+                                    notes:
+                                        task.notes ||
+                                        "",
+
+                                    subtasks:
+                                        Array.isArray(
+                                            task.subtasks
+                                        )
+                                            ? task.subtasks.map(
+                                                subtask => ({
+
+                                                    id:
+                                                        subtask.id ||
+                                                        crypto.randomUUID(),
+
+                                                    text:
+                                                        subtask.text ||
+                                                        "",
+
+                                                    done:
+                                                        Boolean(
+                                                            subtask.done ??
+                                                            subtask.completed
+                                                        )
+                                                })
+                                            )
+                                            : [],
+
+                                    createdAt:
+                                        task.createdAt ||
+                                        Date.now()
+                                })
+                            );
+
+
+                    saveProjects(projects);
+
+                    saveTasks(tasks);
+
+                    updateUI();
+
+                    importInput.value = "";
+
+
+                } catch (error) {
+
+                    console.error(
+                        error
+                    );
+
+
+                    alert(
+                        "Invalid JSON file. Please import a valid tasks.json file."
+                    );
+                }
+            };
+
+
+        reader.readAsText(file);
+    }
+);
+
+
+/* =========================
+   KEYBOARD SHORTCUTS
+========================= */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        const activeElement =
+            document.activeElement;
+
+
+        const isTyping =
+            activeElement &&
+            (
+                activeElement.tagName ===
+                    "INPUT" ||
+                activeElement.tagName ===
+                    "TEXTAREA" ||
+                activeElement.tagName ===
+                    "SELECT"
+            );
+
+
+        /* N → NEW TASK */
+
+        if (
+            event.key.toLowerCase() ===
+                "n" &&
+            !isTyping
+        ) {
+
+            event.preventDefault();
+
+            taskInput.focus();
+        }
+
+
+        /* ESCAPE → CLEAR SEARCH */
+
+        if (
+            event.key === "Escape" &&
+            !taskDetailDialog.open &&
+            !newProjectDialog.open
+        ) {
+
+            searchInput.value = "";
+
+            searchText = "";
+
+            updateUI();
         }
     }
 );
