@@ -96,6 +96,11 @@ const assignPriority =
         "assignPriority"
     );
 
+const assignStatus =
+    document.getElementById(
+        "assignStatus"
+    );
+
 const assignDueDate =
     document.getElementById(
         "assignDueDate"
@@ -293,10 +298,11 @@ assignTaskForm.addEventListener(
                 assignCategory.value,
 
             status:
-                "To Do",
+                assignStatus.value,
 
             done:
-                false,
+                assignStatus.value ===
+                "Done",
 
             description:
                 "",
@@ -334,6 +340,7 @@ assignTaskForm.addEventListener(
 
         assignTaskText.value = "";
         assignDueDate.value = "";
+        assignStatus.value = "To Do";
 
         renderUsersOverview();
     }
