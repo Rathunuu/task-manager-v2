@@ -1,7 +1,8 @@
 import {
     registerUser,
     loginUser,
-    getCurrentUser
+    getCurrentUser,
+    getAllUsers
 } from "./auth.js";
 
 
@@ -54,11 +55,10 @@ const authToggleLabel =
 const authError =
     document.getElementById("authError");
 
-const roleGroup =
-    document.getElementById("roleGroup");
-
-const roleSelect =
-    document.getElementById("roleSelect");
+const firstAdminNote =
+    document.getElementById(
+        "firstAdminNote"
+    );
 
 
 /* =========================
@@ -84,8 +84,8 @@ function updateUIForMode() {
         authToggleBtn.textContent =
             "Sign Up";
 
-        if (roleGroup) {
-            roleGroup.hidden = true;
+        if (firstAdminNote) {
+            firstAdminNote.hidden = true;
         }
 
     } else {
@@ -105,8 +105,16 @@ function updateUIForMode() {
         authToggleBtn.textContent =
             "Log In";
 
-        if (roleGroup) {
-            roleGroup.hidden = false;
+        /*
+           Only the very first signup
+           ever needs to know it will
+           become the Admin automatically.
+        */
+
+        if (firstAdminNote) {
+
+            firstAdminNote.hidden =
+                getAllUsers().length !== 0;
         }
     }
 
@@ -180,16 +188,10 @@ authForm.addEventListener(
 
         } else {
 
-            const selectedRole =
-                roleSelect
-                    ? roleSelect.value
-                    : "user";
-
             const registerResult =
                 registerUser(
                     username,
-                    password,
-                    selectedRole
+                    password
                 );
 
             if (!registerResult.success) {
