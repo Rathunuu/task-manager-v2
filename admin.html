@@ -1,1 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Task Manager - Admin Dashboard</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!--
+        AUTH + ROLE PRE-CHECK
+        Runs before the page paints so a
+        logged-out visitor, or a logged-in
+        non-admin, never sees a flash of
+        the admin dashboard.
+    -->
+    <script>
+        (function () {
+
+            var currentUsername =
+                sessionStorage.getItem(
+                    "task-manager-current-user"
+                );
+
+            if (!currentUsername) {
+
+                window.location.href =
+                    "login.html";
+
+                return;
+            }
+
+            try {
+
+                var users =
+                    JSON.parse(
+                        localStorage.getItem(
+                            "task-manager-users"
+                        ) || "[]"
+                    );
+
+                var matchedUser =
+                    users.find(function (user) {
+                        return (
+                            user.username ===
+                            currentUsername
+                        );
+                    });
+
+                if (
+                    !matchedUser ||
+                    matchedUser.role !== "admin"
+                ) {
+
+                    window.location.href =
+                        "index.html";
+                }
+
+            } catch (error) {
+
+                window.location.href =
+                    "index.html";
+            }
+
+        })();
+    </script>
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- =========================
+             HEADER
+        ========================== -->
+
+        <header class="app-header">
+
+            <div>
+                <span class="eyebrow">ADMIN</span>
+
+                <h1>Admin Dashboard</h1>
+
+                <p>
+                    Manage users and assign tasks.
+                </p>
+            </div>
+
+            <div class="header-right">
+
+                <div class="user-info">
+
+                    <span class="user-info-label">
+                        Logged in as
+                    </span>
+
+                    <strong id="currentUserLabel">
+                        -
+                    </strong>
+
+                    <button
+                        id="logoutBtn"
+                        class="logout-btn"
+                        type="button"
+                    >
+                        Log Out
+                    </button>
+
+                </div>
+
+                <a
+                    href="index.html"
+                    class="secondary-btn"
+                >
+                    My Tasks
+                </a>
+
+            </div>
+
+        </header>
+
+
+        <!-- =========================
+             ADD USER
+        ========================== -->
+
+        <section class="admin-card">
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="eyebrow">USERS</span>
+
+                    <h2>Add New User</h2>
+
+                    <p>
+                        Create a login for a team member or another admin.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <form
+                id="addUserForm"
+                class="admin-form"
+            >
+
+                <div class="input-group">
+
+                    <label for="newUsername">
+                        Username
+                    </label>
+
+                    <input
+                        type="text"
+                        id="newUsername"
+                        placeholder="e.g. priya"
+                        autocomplete="off"
+                    >
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="newPassword">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="newPassword"
+                        placeholder="Set a password"
+                        autocomplete="off"
+                    >
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="newRole">
+                        Role
+                    </label>
+
+                    <select id="newRole">
+
+                        <option value="user">
+                            User
+                        </option>
+
+                        <option value="admin">
+                            Admin
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="primary-btn"
+                >
+                    + Add User
+                </button>
+
+            </form>
+
+
+            <div
+                id="addUserMessage"
+                class="admin-message"
+                hidden
+            ></div>
+
+        </section>
+
+
+        <!-- =========================
+             ASSIGN TASK
+        ========================== -->
+
+        <section class="admin-card">
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="eyebrow">TASKS</span>
+
+                    <h2>Assign a Task</h2>
+
+                    <p>
+                        Give a task directly to a user's task list.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <form
+                id="assignTaskForm"
+                class="admin-form"
+            >
+
+                <div class="input-group">
+
+                    <label for="assignUserSelect">
+                        Assign to
+                    </label>
+
+                    <select id="assignUserSelect">
+                        <!-- Populated by admin.js -->
+                    </select>
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="assignTaskText">
+                        Task
+                    </label>
+
+                    <input
+                        type="text"
+                        id="assignTaskText"
+                        placeholder="What needs to be done?"
+                        autocomplete="off"
+                    >
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="assignCategory">
+                        Category
+                    </label>
+
+                    <select id="assignCategory">
+
+                        <option value="Work">
+                            Work
+                        </option>
+
+                        <option value="Personal">
+                            Personal
+                        </option>
+
+                        <option value="Urgent">
+                            Urgent
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="assignPriority">
+                        Priority
+                    </label>
+
+                    <select id="assignPriority">
+
+                        <option value="Low">
+                            Low
+                        </option>
+
+                        <option
+                            value="Normal"
+                            selected
+                        >
+                            Normal
+                        </option>
+
+                        <option value="High">
+                            High
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="assignDueDate">
+                        Due date
+                    </label>
+
+                    <input
+                        type="date"
+                        id="assignDueDate"
+                    >
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="primary-btn"
+                >
+                    + Assign Task
+                </button>
+
+            </form>
+
+
+            <div
+                id="assignTaskMessage"
+                class="admin-message"
+                hidden
+            ></div>
+
+        </section>
+
+
+        <!-- =========================
+             ALL USERS OVERVIEW
+        ========================== -->
+
+        <section class="admin-card">
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="eyebrow">OVERVIEW</span>
+
+                    <h2>All Users &amp; Their Tasks</h2>
+
+                    <p>
+                        See what everyone has been working on.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div
+                id="usersOverview"
+                class="users-overview"
+            >
+                <!-- Rendered by admin.js -->
+            </div>
+
+        </section>
+
+    </div>
+
+
+    <script
+        type="module"
+        src="admin.js"
+    ></script>
+
+</body>
+
+</html>
