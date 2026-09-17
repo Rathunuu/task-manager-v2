@@ -1654,6 +1654,25 @@ dialog::backdrop {
     font-size: 13.5px;
 }
 
+.auth-first-admin-note {
+    margin-top: -12px;
+    margin-bottom: 20px !important;
+
+    padding: 9px 12px;
+
+    background: #eefaf1;
+
+    border: 1px solid #c8ecd2;
+    border-radius: 9px;
+
+    color: #1e7d3c;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    line-height: 1.4;
+}
+
 .auth-card .input-group {
     margin-bottom: 16px;
 }
