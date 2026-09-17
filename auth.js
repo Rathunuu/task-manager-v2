@@ -88,17 +88,6 @@ export function registerUser(
     username =
         String(username || "").trim();
 
-    /*
-       Only "admin" or "user" are
-       valid roles. Anything else
-       falls back to "user".
-    */
-
-    role =
-        role === "admin"
-            ? "admin"
-            : "user";
-
     if (!username || !password) {
 
         return {
@@ -126,16 +115,42 @@ export function registerUser(
         };
     }
 
+    /*
+       AUTO-ADMIN RULE:
+
+       The very first account ever
+       created on this app automatically
+       becomes Admin - nobody has to pick
+       a role on the public signup form.
+
+       Every other public signup is a
+       plain "user". Only the admin
+       dashboard (which passes role
+       explicitly) can create more admins.
+    */
+
+    const finalRole =
+        users.length === 0
+            ? "admin"
+            : (
+                role === "admin"
+                    ? "admin"
+                    : "user"
+            );
+
     users.push({
         username,
         passwordHash:
             simpleHash(password),
-        role
+        role: finalRole
     });
 
     saveUsers(users);
 
-    return { success: true };
+    return {
+        success: true,
+        role: finalRole
+    };
 }
 
 
