@@ -1,1215 +1,175 @@
-// ==========================================
-// TASK MANAGER V2 - STORAGE
-// Week 2 + Week 3
-// Master Admin + Multi User + Task Assignment
-// ==========================================
+import { getCurrentUser } from "./auth.js";
 
 
-// ==========================================
-// STORAGE KEYS
-// ==========================================
+/* =========================
+   PER-USER STORAGE KEYS
 
-const USERS_KEY = "tm_users";
-const SESSION_KEY = "tm_session";
-const TASKS_KEY = "tm_tasks";
-const PROJECTS_KEY = "tm_projects";
+   Each user gets their own
+   tasks/projects keys, so users
+   never see each other's data
+   unless the admin dashboard
+   explicitly asks for it.
+========================= */
 
+function tasksKeyFor(username) {
 
-// ==========================================
-// MASTER ADMIN
-// ==========================================
-
-const MASTER_ADMIN = {
-    id: "master-admin",
-    name: "Master Admin",
-    email: "admin@taskmanager.com",
-    password: "admin123",
-    role: "admin"
-};
-
-
-// ==========================================
-// ID GENERATOR
-// ==========================================
-
-function makeId(prefix = "id") {
-    if (
-        typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
-    ) {
-        return `${prefix}-${crypto.randomUUID()}`;
-    }
-
-    return `${prefix}-${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2, 10)}`;
+    return `task-manager-tasks-${username || "guest"}`;
 }
 
 
-// ==========================================
-// SAFE STORAGE HELPERS
-// ==========================================
+function projectsKeyFor(username) {
 
-function readJSON(key, fallback) {
+    return `task-manager-projects-${username || "guest"}`;
+}
+
+
+/* =========================
+   TASK STORAGE (any user)
+
+   Used by the admin dashboard to
+   read/write a specific user's
+   tasks, and internally by the
+   current-user helpers below.
+========================= */
+
+export function loadTasksForUser(username) {
+
+    const storedTasks =
+        localStorage.getItem(
+            tasksKeyFor(username)
+        );
+
+    if (!storedTasks) {
+        return [];
+    }
+
     try {
-        const value = localStorage.getItem(key);
 
-        if (!value) {
-            return fallback;
+        const tasks =
+            JSON.parse(storedTasks);
+
+        if (!Array.isArray(tasks)) {
+            return [];
         }
 
-        const parsed = JSON.parse(value);
-
-        return parsed;
-    } catch (error) {
-        console.error(`Storage read error for ${key}:`, error);
-        return fallback;
-    }
-}
-
-
-function writeJSON(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-        return true;
-    } catch (error) {
-        console.error(`Storage write error for ${key}:`, error);
-        return false;
-    }
-}
-
-
-// ==========================================
-// USERS
-// ==========================================
-
-export function loadUsers() {
-    const users = readJSON(USERS_KEY, []);
-
-    return Array.isArray(users) ? users : [];
-}
-
-
-export function saveUsers(users) {
-    return writeJSON(
-        USERS_KEY,
-        Array.isArray(users) ? users : []
-    );
-}
-
-
-export function findUserByEmail(email) {
-    if (!email) {
-        return null;
-    }
-
-    const cleanEmail = String(email)
-        .trim()
-        .toLowerCase();
-
-    const users = loadUsers();
-
-    return (
-        users.find(
-            user =>
-                user &&
-                user.email &&
-                String(user.email).toLowerCase() === cleanEmail
-        ) || null
-    );
-}
-
-
-// ==========================================
-// REGISTER
-// ==========================================
-
-export function registerUser(name, email, password) {
-
-    const cleanName = String(name || "").trim();
-
-    const cleanEmail = String(email || "")
-        .trim()
-        .toLowerCase();
-
-    const cleanPassword = String(password || "");
-
-
-    if (!cleanName) {
-        return {
-            success: false,
-            message: "Please enter your name."
-        };
-    }
-
-
-    if (!cleanEmail) {
-        return {
-            success: false,
-            message: "Please enter your email."
-        };
-    }
-
-
-    if (!cleanPassword) {
-        return {
-            success: false,
-            message: "Please enter a password."
-        };
-    }
-
-
-    if (cleanPassword.length < 4) {
-        return {
-            success: false,
-            message: "Password must contain at least 4 characters."
-        };
-    }
-
-
-    if (cleanEmail === MASTER_ADMIN.email) {
-        return {
-            success: false,
-            message: "This email is reserved for Master Admin."
-        };
-    }
-
-
-    if (findUserByEmail(cleanEmail)) {
-        return {
-            success: false,
-            message: "An account with this email already exists."
-        };
-    }
-
-
-    const newUser = {
-        id: makeId("user"),
-        name: cleanName,
-        email: cleanEmail,
-        password: cleanPassword,
-        role: "user",
-        createdAt: new Date().toISOString()
-    };
-
-
-    const users = loadUsers();
-
-    users.push(newUser);
-
-    saveUsers(users);
-
-
-    // Create empty storage
-    saveTasks(newUser.id, []);
-    saveProjects(newUser.id, []);
-
-
-    // Create default project
-    ensureDefaultProject(newUser.id);
-
-
-    return {
-        success: true,
-        user: newUser
-    };
-}
-
-
-// ==========================================
-// MASTER ADMIN
-// ==========================================
-
-export function isMasterCredentials(email, password) {
-
-    return (
-        String(email || "")
-            .trim()
-            .toLowerCase() === MASTER_ADMIN.email &&
-        String(password || "") === MASTER_ADMIN.password
-    );
-}
-
-
-export function getMasterUser() {
-    return {
-        ...MASTER_ADMIN
-    };
-}
-
-
-export function isAdmin(user) {
-    return Boolean(
-        user &&
-        user.role === "admin"
-    );
-}
-
-
-export function getAllRegularUsers() {
-
-    return loadUsers().filter(
-        user =>
-            user &&
-            user.role !== "admin"
-    );
-}
-
-
-// ==========================================
-// LOGIN
-// ==========================================
-
-export function loginUser(email, password) {
-
-    const cleanEmail = String(email || "")
-        .trim()
-        .toLowerCase();
-
-    const cleanPassword = String(password || "");
-
-
-    // --------------------------------------
-    // MASTER ADMIN LOGIN
-    // --------------------------------------
-
-    if (
-        cleanEmail === MASTER_ADMIN.email &&
-        cleanPassword === MASTER_ADMIN.password
-    ) {
-
-        const adminUser = getMasterUser();
-
-        setCurrentUser(adminUser);
-
-        return {
-            success: true,
-            user: adminUser
-        };
-    }
-
-
-    // --------------------------------------
-    // NORMAL USER LOGIN
-    // --------------------------------------
-
-    const user = findUserByEmail(cleanEmail);
-
-
-    if (!user) {
-        return {
-            success: false,
-            message: "No account found with this email."
-        };
-    }
-
-
-    if (user.password !== cleanPassword) {
-        return {
-            success: false,
-            message: "Incorrect password."
-        };
-    }
-
-
-    setCurrentUser(user);
-
-
-    return {
-        success: true,
-        user
-    };
-}
-
-
-// ==========================================
-// SESSION
-// ==========================================
-
-export function getCurrentUser() {
-
-    try {
-
-        const value =
-            localStorage.getItem(SESSION_KEY);
-
-        if (!value) {
-            return null;
-        }
-
-        const user = JSON.parse(value);
-
-        return user || null;
+        return tasks;
 
     } catch (error) {
 
         console.error(
-            "Session read error:",
+            "Could not load tasks:",
             error
         );
 
-        return null;
-    }
-}
-
-
-export function setCurrentUser(user) {
-
-    if (!user) {
-        localStorage.removeItem(SESSION_KEY);
-        return;
-    }
-
-    localStorage.setItem(
-        SESSION_KEY,
-        JSON.stringify(user)
-    );
-}
-
-
-export function clearCurrentUser() {
-    localStorage.removeItem(SESSION_KEY);
-}
-
-
-// ==========================================
-// TASK STORAGE
-// ==========================================
-
-export function loadTasks(userId) {
-
-    if (!userId) {
         return [];
+
     }
-
-
-    const allTasks =
-        readJSON(TASKS_KEY, {});
-
-
-    if (
-        !allTasks ||
-        typeof allTasks !== "object" ||
-        Array.isArray(allTasks)
-    ) {
-        return [];
-    }
-
-
-    const userTasks =
-        allTasks[userId];
-
-
-    return Array.isArray(userTasks)
-        ? userTasks
-        : [];
 }
 
 
-export function saveTasks(userId, tasks) {
-
-    if (!userId) {
-        return false;
-    }
-
-
-    const allTasks =
-        readJSON(TASKS_KEY, {});
-
-
-    if (
-        !allTasks ||
-        typeof allTasks !== "object" ||
-        Array.isArray(allTasks)
-    ) {
-        return false;
-    }
-
-
-    allTasks[userId] =
-        Array.isArray(tasks)
-            ? tasks
-            : [];
-
-
-    return writeJSON(
-        TASKS_KEY,
-        allTasks
-    );
-}
-
-
-// ==========================================
-// CREATE TASK
-// ==========================================
-
-export function createTask(
-    userId,
-    taskData = {}
-) {
-
-    if (!userId) {
-        return null;
-    }
-
-
-    const task = {
-
-        id: makeId("task"),
-
-        title:
-            String(
-                taskData.title || ""
-            ).trim(),
-
-        description:
-            String(
-                taskData.description || ""
-            ).trim(),
-
-        category:
-            taskData.category || "Work",
-
-        status:
-            taskData.status || "To Do",
-
-        priority:
-            taskData.priority || "Medium",
-
-        dueDate:
-            taskData.dueDate || "",
-
-        projectId:
-            taskData.projectId ||
-            ensureDefaultProject(userId)?.id ||
-            null,
-
-        assignedTo:
-            taskData.assignedTo ||
-            userId,
-
-        createdBy:
-            taskData.createdBy ||
-            userId,
-
-        createdAt:
-            taskData.createdAt ||
-            new Date().toISOString(),
-
-        updatedAt:
-            new Date().toISOString(),
-
-        notes:
-            String(
-                taskData.notes || ""
-            ),
-
-        subtasks:
-            Array.isArray(taskData.subtasks)
-                ? taskData.subtasks
-                : []
-    };
-
-
-    const tasks =
-        loadTasks(userId);
-
-
-    tasks.push(task);
-
-
-    saveTasks(
-        userId,
-        tasks
-    );
-
-
-    return task;
-}
-
-
-// ==========================================
-// ADMIN - LOAD USER TASKS
-// ==========================================
-
-export function loadUserTasksForAdmin(userId) {
-
-    if (!userId) {
-        return [];
-    }
-
-    return loadTasks(userId);
-}
-
-
-// ==========================================
-// ADMIN - SAVE USER TASKS
-// ==========================================
-
-export function saveUserTasksForAdmin(
-    userId,
+export function saveTasksForUser(
+    username,
     tasks
 ) {
 
-    if (!userId) {
-        return false;
-    }
-
-    return saveTasks(
-        userId,
-        tasks
+    localStorage.setItem(
+        tasksKeyFor(username),
+        JSON.stringify(tasks)
     );
+
 }
 
 
-// ==========================================
-// ADMIN - ASSIGN TASK
-// ==========================================
+/* =========================
+   PROJECT STORAGE (any user)
+========================= */
 
-export function createAssignedTask(
-    userId,
-    taskData = {},
-    adminId = MASTER_ADMIN.id
-) {
+export function loadProjectsForUser(username) {
 
-    if (!userId) {
-        return null;
-    }
-
-
-    // Make sure the user has a project
-    const defaultProject =
-        ensureDefaultProject(userId);
-
-
-    const assignedTask = {
-
-        id: makeId("task"),
-
-        title:
-            String(
-                taskData.title || ""
-            ).trim(),
-
-        description:
-            String(
-                taskData.description || ""
-            ).trim(),
-
-        category:
-            taskData.category || "Work",
-
-        status:
-            taskData.status || "To Do",
-
-        priority:
-            taskData.priority || "Medium",
-
-        dueDate:
-            taskData.dueDate || "",
-
-        // Important:
-        // Assigned tasks should belong
-        // to a visible user project.
-        projectId:
-            taskData.projectId ||
-            defaultProject?.id ||
-            null,
-
-        assignedTo:
-            userId,
-
-        createdBy:
-            adminId,
-
-        createdAt:
-            new Date().toISOString(),
-
-        updatedAt:
-            new Date().toISOString(),
-
-        notes: "",
-
-        subtasks: []
-    };
-
-
-    const tasks =
-        loadTasks(userId);
-
-
-    tasks.push(assignedTask);
-
-
-    saveTasks(
-        userId,
-        tasks
-    );
-
-
-    return assignedTask;
-}
-
-
-// ==========================================
-// UPDATE TASK
-// ==========================================
-
-export function updateTask(
-    userId,
-    taskId,
-    updates = {}
-) {
-
-    if (!userId || !taskId) {
-        return null;
-    }
-
-
-    const tasks =
-        loadTasks(userId);
-
-
-    const index =
-        tasks.findIndex(
-            task =>
-                task &&
-                task.id === taskId
+    const storedProjects =
+        localStorage.getItem(
+            projectsKeyFor(username)
         );
 
-
-    if (index === -1) {
-        return null;
-    }
-
-
-    const updatedTask = {
-        ...tasks[index],
-        ...updates,
-        id: tasks[index].id,
-        updatedAt:
-            new Date().toISOString()
-    };
-
-
-    tasks[index] =
-        updatedTask;
-
-
-    saveTasks(
-        userId,
-        tasks
-    );
-
-
-    return updatedTask;
-}
-
-
-// ==========================================
-// DELETE TASK
-// ==========================================
-
-export function deleteTask(
-    userId,
-    taskId
-) {
-
-    if (!userId || !taskId) {
-        return null;
-    }
-
-
-    const tasks =
-        loadTasks(userId);
-
-
-    const index =
-        tasks.findIndex(
-            task =>
-                task &&
-                task.id === taskId
-        );
-
-
-    if (index === -1) {
-        return null;
-    }
-
-
-    const deletedTask =
-        tasks[index];
-
-
-    tasks.splice(
-        index,
-        1
-    );
-
-
-    saveTasks(
-        userId,
-        tasks
-    );
-
-
-    return deletedTask;
-}
-
-
-// ==========================================
-// UNDO DELETE
-// ==========================================
-
-export function undoDeleteTask(
-    userId,
-    task
-) {
-
-    if (
-        !userId ||
-        !task ||
-        !task.id
-    ) {
-        return null;
-    }
-
-
-    const tasks =
-        loadTasks(userId);
-
-
-    const alreadyExists =
-        tasks.some(
-            existingTask =>
-                existingTask.id === task.id
-        );
-
-
-    if (alreadyExists) {
-        return task;
-    }
-
-
-    tasks.push({
-        ...task,
-        updatedAt:
-            new Date().toISOString()
-    });
-
-
-    saveTasks(
-        userId,
-        tasks
-    );
-
-
-    return task;
-}
-
-
-// ==========================================
-// PROJECT STORAGE
-// ==========================================
-
-export function loadProjects(userId) {
-
-    if (!userId) {
+    if (!storedProjects) {
         return [];
     }
 
+    try {
 
-    const allProjects =
-        readJSON(
-            PROJECTS_KEY,
-            {}
+        const projects =
+            JSON.parse(storedProjects);
+
+        if (!Array.isArray(projects)) {
+            return [];
+        }
+
+        return projects;
+
+    } catch (error) {
+
+        console.error(
+            "Could not load projects:",
+            error
         );
 
-
-    if (
-        !allProjects ||
-        typeof allProjects !== "object" ||
-        Array.isArray(allProjects)
-    ) {
         return [];
+
     }
-
-
-    const projects =
-        allProjects[userId];
-
-
-    return Array.isArray(projects)
-        ? projects
-        : [];
 }
 
 
-export function saveProjects(
-    userId,
+export function saveProjectsForUser(
+    username,
     projects
 ) {
 
-    if (!userId) {
-        return false;
-    }
+    localStorage.setItem(
+        projectsKeyFor(username),
+        JSON.stringify(projects)
+    );
+
+}
 
 
-    const allProjects =
-        readJSON(
-            PROJECTS_KEY,
-            {}
-        );
+/* =========================
+   CURRENT-USER SHORTCUTS
 
+   app.js keeps calling these
+   exactly as before - they just
+   forward to the "ForUser" versions
+   using whoever is logged in.
+========================= */
 
-    if (
-        !allProjects ||
-        typeof allProjects !== "object" ||
-        Array.isArray(allProjects)
-    ) {
-        return false;
-    }
+export function loadTasks() {
 
-
-    allProjects[userId] =
-        Array.isArray(projects)
-            ? projects
-            : [];
-
-
-    return writeJSON(
-        PROJECTS_KEY,
-        allProjects
+    return loadTasksForUser(
+        getCurrentUser()
     );
 }
 
 
-// ==========================================
-// CREATE PROJECT
-// ==========================================
+export function saveTasks(tasks) {
 
-export function createProject(
-    userId,
-    projectName
-) {
-
-    if (!userId) {
-        return null;
-    }
+    saveTasksForUser(
+        getCurrentUser(),
+        tasks
+    );
+}
 
 
-    const cleanName =
-        String(
-            projectName || ""
-        ).trim();
+export function loadProjects() {
+
+    return loadProjectsForUser(
+        getCurrentUser()
+    );
+}
 
 
-    if (!cleanName) {
-        return null;
-    }
+export function saveProjects(projects) {
 
-
-    const project = {
-
-        id: makeId("project"),
-
-        name: cleanName,
-
-        createdAt:
-            new Date().toISOString()
-    };
-
-
-    const projects =
-        loadProjects(userId);
-
-
-    projects.push(project);
-
-
-    saveProjects(
-        userId,
+    saveProjectsForUser(
+        getCurrentUser(),
         projects
     );
-
-
-    return project;
-}
-
-
-// ==========================================
-// DEFAULT PROJECT
-// ==========================================
-
-export function ensureDefaultProject(userId) {
-
-    if (!userId) {
-        return null;
-    }
-
-
-    let projects =
-        loadProjects(userId);
-
-
-    if (projects.length > 0) {
-        return projects[0];
-    }
-
-
-    const defaultProject = {
-
-        id: makeId("project"),
-
-        name: "My Tasks",
-
-        createdAt:
-            new Date().toISOString()
-    };
-
-
-    projects = [
-        defaultProject
-    ];
-
-
-    saveProjects(
-        userId,
-        projects
-    );
-
-
-    return defaultProject;
-}
-
-
-// ==========================================
-// DELETE PROJECT
-// ==========================================
-
-export function deleteProject(
-    userId,
-    projectId
-) {
-
-    if (
-        !userId ||
-        !projectId
-    ) {
-        return false;
-    }
-
-
-    const projects =
-        loadProjects(userId);
-
-
-    const filteredProjects =
-        projects.filter(
-            project =>
-                project.id !== projectId
-        );
-
-
-    if (
-        filteredProjects.length ===
-        projects.length
-    ) {
-        return false;
-    }
-
-
-    // Do not allow the user
-    // to remove their only project.
-    if (
-        filteredProjects.length === 0
-    ) {
-        return false;
-    }
-
-
-    saveProjects(
-        userId,
-        filteredProjects
-    );
-
-
-    // Remove project reference
-    // from existing tasks.
-    const tasks =
-        loadTasks(userId);
-
-
-    const updatedTasks =
-        tasks.map(task => {
-
-            if (
-                task.projectId === projectId
-            ) {
-
-                return {
-                    ...task,
-                    projectId:
-                        filteredProjects[0].id,
-                    updatedAt:
-                        new Date().toISOString()
-                };
-            }
-
-
-            return task;
-        });
-
-
-    saveTasks(
-        userId,
-        updatedTasks
-    );
-
-
-    return true;
-}
-
-
-// ==========================================
-// CLEAR USER DATA
-// ==========================================
-
-export function clearUserData(userId) {
-
-    if (!userId) {
-        return false;
-    }
-
-
-    const allTasks =
-        readJSON(
-            TASKS_KEY,
-            {}
-        );
-
-
-    const allProjects =
-        readJSON(
-            PROJECTS_KEY,
-            {}
-        );
-
-
-    if (
-        allTasks &&
-        typeof allTasks === "object"
-    ) {
-        delete allTasks[userId];
-    }
-
-
-    if (
-        allProjects &&
-        typeof allProjects === "object"
-    ) {
-        delete allProjects[userId];
-    }
-
-
-    const tasksSaved =
-        writeJSON(
-            TASKS_KEY,
-            allTasks
-        );
-
-
-    const projectsSaved =
-        writeJSON(
-            PROJECTS_KEY,
-            allProjects
-        );
-
-
-    return (
-        tasksSaved &&
-        projectsSaved
-    );
-}
-
-
-// ==========================================
-// EXPORT USER DATA
-// ==========================================
-
-export function getUserDataForExport(
-    userId
-) {
-
-    if (!userId) {
-        return null;
-    }
-
-
-    return {
-
-        exportedAt:
-            new Date().toISOString(),
-
-        userId,
-
-        tasks:
-            loadTasks(userId),
-
-        projects:
-            loadProjects(userId)
-    };
-}
-
-
-// ==========================================
-// IMPORT USER DATA
-// ==========================================
-
-export function importUserData(
-    userId,
-    data
-) {
-
-    if (
-        !userId ||
-        !data ||
-        typeof data !== "object"
-    ) {
-        return false;
-    }
-
-
-    if (
-        Array.isArray(data.tasks)
-    ) {
-
-        saveTasks(
-            userId,
-            data.tasks
-        );
-    }
-
-
-    if (
-        Array.isArray(data.projects)
-    ) {
-
-        saveProjects(
-            userId,
-            data.projects
-        );
-    }
-
-
-    // Make sure imported data
-    // still has a project.
-    if (
-        loadProjects(userId).length === 0
-    ) {
-        ensureDefaultProject(userId);
-    }
-
-
-    return true;
 }
